@@ -386,26 +386,38 @@ export function BrandBiddingClient() {
               />
             </div>
           </div>
-          <div className="mt-3">
-            <label className="block text-xs text-muted-foreground mb-1">Tipo de relatório</label>
-            <div className="flex gap-2">
-              {(["Semanal", "Quinzenal"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setReportType(t);
-                    setPeriodDays(t === "Semanal" ? "7" : "14");
-                  }}
-                  className={cn(
-                    "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all",
-                    reportType === t
-                      ? "bg-primary text-white border-primary"
-                      : "border-border text-muted-foreground hover:border-primary/40"
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
+          <div className="mt-3 flex items-end gap-4">
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">Tipo de relatório</label>
+              <div className="flex gap-2">
+                {(["Semanal", "Quinzenal"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => {
+                      setReportType(t);
+                      setPeriodDays(t === "Semanal" ? "7" : "14");
+                    }}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all",
+                      reportType === t
+                        ? "bg-primary text-white border-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="w-28">
+              <label className="block text-xs text-muted-foreground mb-1">Nº de dias</label>
+              <input
+                type="number"
+                min="1"
+                value={periodDays}
+                onChange={(e) => setPeriodDays(e.target.value)}
+                className="w-full rounded-lg border border-border bg-white px-3 py-1.5 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
             </div>
           </div>
         </div>
