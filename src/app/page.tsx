@@ -1,5 +1,5 @@
-import { BrandBiddingClient } from "@/components/report-client";
+import { AppShell } from "@/components/app-shell";
 
 export default function Home() {
-  return <BrandBiddingClient />;
+  return <AppShell />;
 }

@@ -1026,21 +1026,7 @@ export function BrandBiddingClient() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <div className="border-b border-border/60 bg-white px-6 py-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Shield size={18} className="text-primary" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Relatório Brand Bidding</h1>
-            <p className="text-xs text-muted-foreground">
-              Preencha os dados e gere o PDF no padrão Branddi
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col flex-1 bg-background overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl mx-auto">
           <StepIndicator current={step} />
