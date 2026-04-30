@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 const PIPEFY_GRAPHQL = "https://api.pipefy.com/graphql";
 
@@ -214,9 +211,27 @@ Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
   "observacao": "string"
 }`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result_ai = await model.generateContent(prompt);
-    const rawText = result_ai.response.text();
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY || ""}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 512,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!groqRes.ok) {
+      const err = await groqRes.text();
+      throw new Error(`Groq API: ${groqRes.status} — ${err}`);
+    }
+
+    const groqData = await groqRes.json();
+    const rawText: string = groqData.choices?.[0]?.message?.content ?? "";
 
     let result: unknown;
     try {
