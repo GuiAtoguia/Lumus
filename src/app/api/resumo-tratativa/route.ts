@@ -214,7 +214,7 @@ Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
   "observacao": "string"
 }`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result_ai = await model.generateContent(prompt);
     const rawText = result_ai.response.text();
 
