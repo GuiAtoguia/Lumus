@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Shield, FileSearch } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BrandBiddingClient } from "@/components/report-client";
+import { BrandBiddingClient } from "@/components/brand-bidding-client";
 import { ResumoTratativaClient } from "@/components/resumo-tratativa-client";
 
 type Tab = "relatorio" | "resumo";
@@ -19,7 +19,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
     id: "resumo",
     label: "Resumo de Tratativa",
     icon: FileSearch,
-    desc: "Resumo via Pipedrive",
+    desc: "Resumo via Pipefy",
   },
 ];
 
