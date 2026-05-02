@@ -68,21 +68,61 @@ async function fetchCard(cardId: string, token: string) {
 }
 
 function parseCardId(url: string): string {
-  // https://app.pipefy.com/open-cards/594136233
   const openCard = url.match(/open-cards\/(\d+)/i);
   if (openCard) return openCard[1];
 
-  // https://app.pipefy.com/pipes/123#cards/456
   const pipeCard = url.match(/[#/]cards?\/(\d+)/i);
   if (pipeCard) return pipeCard[1];
 
-  // Last long numeric segment as fallback
   const fallback = url.match(/(\d{6,})/);
   if (fallback) return fallback[1];
 
   throw new Error(
     "Não foi possível extrair o ID do card da URL. Use o formato https://app.pipefy.com/open-cards/ID"
   );
+}
+
+function formatDate(isoString: string): string {
+  const d = new Date(isoString);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function hasLabel(labels: { name: string }[], ...terms: string[]): boolean {
+  return labels.some((l) =>
+    terms.some((t) => l.name.toLowerCase().includes(t.toLowerCase()))
+  );
+}
+
+function buildObservacao(
+  phase: string | null,
+  notifications: number,
+  retorno: "Sim" | "Não",
+  lastComm: string | null,
+  labels: { name: string }[]
+): string {
+  const parts: string[] = [];
+
+  if (phase) parts.push(`Fase atual: ${phase}.`);
+
+  if (notifications > 0) {
+    parts.push(`${notifications} notificação${notifications > 1 ? "ões" : ""} enviada${notifications > 1 ? "s" : ""}.`);
+  } else {
+    parts.push("Nenhuma notificação registrada.");
+  }
+
+  parts.push(retorno === "Sim" ? "Houve retorno do agressor." : "Sem retorno do agressor.");
+
+  if (lastComm) parts.push(`Última comunicação: ${lastComm}.`);
+
+  const priority = hasLabel(labels, "hotline", "prioridade");
+  if (priority) parts.push("Caso prioritário.");
+
+  let result = parts.join(" ");
+  if (result.length > 200) result = result.slice(0, 197) + "...";
+  return result;
 }
 
 export async function POST(request: NextRequest) {
@@ -136,116 +176,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Sort comments newest first
-    const sortedComments = [...(card.comments ?? [])].sort(
-      (a: { created_at: string }, b: { created_at: string }) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const labels: { name: string }[] = card.labels ?? [];
+
+    // 1. Nome do agressor
+    const nomeAgressor: string = card.title ?? "";
+
+    // 2. Etiqueta Top Leilão
+    const etiquetaTopLeilao = hasLabel(labels, "top leilão", "top leilao")
+      ? "Ativada"
+      : "Não ativada";
+
+    // 3. Notificações enviadas — conta entradas de fase "Quarentena"
+    const notificacoesEnviadas: number = (card.phases_history ?? []).filter(
+      (h: { phase: { name: string } }) =>
+        h.phase?.name?.toLowerCase().includes("quarentena")
+    ).length;
+
+    // 4. Última comunicação
+    const comments: { created_at: string }[] = card.comments ?? [];
+    let ultimaComunicacao: string | null = null;
+    if (comments.length > 0) {
+      const latest = comments.reduce((a, b) =>
+        new Date(a.created_at) > new Date(b.created_at) ? a : b
+      );
+      ultimaComunicacao = formatDate(latest.created_at);
+    }
+
+    // 5. Retorno
+    const retorno = hasLabel(labels, "respondeu", "respondido", "confirmou a negativação")
+      ? "Sim"
+      : "Não";
+
+    // 6. Observação
+    const observacao = buildObservacao(
+      card.current_phase?.name ?? null,
+      notificacoesEnviadas,
+      retorno,
+      ultimaComunicacao,
+      labels
     );
 
-    const context = {
-      title: card.title,
-      current_phase: card.current_phase?.name ?? null,
-      done: card.done,
-      created_at: card.created_at,
-      updated_at: card.updated_at,
-      due_date: card.due_date,
-      labels: (card.labels ?? []).map((l: { name: string; color: string }) => ({
-        name: l.name,
-        color: l.color,
-      })),
-      comments: sortedComments
-        .slice(0, 15)
-        .map((c: { text: string; created_at: string; author?: { name: string } }) => ({
-          text: c.text,
-          created_at: c.created_at,
-          author: c.author?.name ?? "—",
-        })),
-      phases_history: (card.phases_history ?? []).map(
-        (h: {
-          phase: { name: string };
-          firstTimeIn: string;
-          lastTimeIn: string;
-          duration: number;
-        }) => ({
-          phase_name: h.phase?.name,
-          firstTimeIn: h.firstTimeIn,
-          lastTimeIn: h.lastTimeIn,
-          duration_seconds: h.duration,
-        })
-      ),
-      fields: (card.fields ?? [])
-        .filter((f: { value: string | null }) => f.value !== null && f.value !== "")
-        .map((f: { field: { label: string }; value: string }) => ({
-          label: f.field?.label,
-          value: f.value,
-        })),
-    };
-
-    const prompt = `Você é um analista da Branddi Monitor especializado em negativações de marca (brand bidding).
-Analise os dados abaixo de um card do Pipefy e preencha cada campo com precisão.
-
-DADOS DO CARD:
-${JSON.stringify(context, null, 2)}
-
-INSTRUÇÕES:
-
-1. nomeAgressor: Use exatamente o valor de "title".
-
-2. etiquetaTopLeilao: Verifique se existe alguma label cujo "name" contenha "Top Leilão" (ignore maiúsculas/minúsculas). Retorne "Ativada" ou "Não ativada".
-
-3. notificacoesEnviadas: Analise "phases_history" e conte quantas entradas possuem um "phase_name" que contenha a palavra "Quarentena" (ignore maiúsculas/minúsculas). Retorne o número (0 se nenhuma).
-
-4. ultimaComunicacao: Encontre a data mais recente entre todos os "comments[].created_at". Converta para o formato DD/MM/AAAA. Retorne null se não houver comentários.
-
-5. retorno: Verifique se alguma label tem "name" contendo "Respondeu", "Respondido" ou "Confirmou a negativação" (ignore maiúsculas/minúsculas). Retorne "Sim" ou "Não".
-
-6. observacao: Escreva um resumo estratégico em PORTUGUÊS CORRETO com EXATAMENTE NO MÁXIMO 200 caracteres. Baseie-se apenas nos dados reais (comentários, etiquetas, fase atual). Destaque: trabalho realizado, canais utilizados, se houve retorno, período sem ocorrências. Se houver labels como "Hotline" ou "Prioridade", mencione como ponto positivo. NUNCA invente dados. Não cite ferramentas ou sistemas pelo nome.
-
-Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
-{
-  "nomeAgressor": "string",
-  "etiquetaTopLeilao": "Ativada" | "Não ativada",
-  "notificacoesEnviadas": number,
-  "ultimaComunicacao": "DD/MM/AAAA" | null,
-  "retorno": "Sim" | "Não",
-  "observacao": "string"
-}`;
-
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.GROQ_API_KEY || ""}`,
+    return NextResponse.json({
+      success: true,
+      data: {
+        nomeAgressor,
+        etiquetaTopLeilao,
+        notificacoesEnviadas,
+        ultimaComunicacao,
+        retorno,
+        observacao,
       },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 512,
-        temperature: 0.1,
-      }),
     });
-
-    if (!groqRes.ok) {
-      const err = await groqRes.text();
-      throw new Error(`Groq API: ${groqRes.status} — ${err}`);
-    }
-
-    const groqData = await groqRes.json();
-    const rawText: string = groqData.choices?.[0]?.message?.content ?? "";
-
-    let result: unknown;
-    try {
-      const clean = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      result = JSON.parse(clean);
-    } catch {
-      return NextResponse.json({
-        success: false,
-        error: "A IA não retornou um JSON válido. Tente novamente.",
-        rawResponse: rawText,
-      });
-    }
-
-    return NextResponse.json({ success: true, data: result });
   } catch (error) {
     console.error("resumo-tratativa error:", error);
     const msg = error instanceof Error ? error.message : "Erro desconhecido.";
