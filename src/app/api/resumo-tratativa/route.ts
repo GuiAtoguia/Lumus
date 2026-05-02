@@ -147,9 +147,15 @@ export async function POST(request: NextRequest) {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
+    const reincidente = (card.phases_history ?? []).some(
+      (h: { phase: { name: string } }) =>
+        h.phase?.name?.toLowerCase().includes("sucesso")
+    );
+
     const context = {
       title: card.title,
       current_phase: card.current_phase?.name ?? null,
+      reincidente,
       labels: (card.labels ?? []).map((l: { name: string }) => l.name),
       comments: sortedComments
         .slice(0, 6)
@@ -178,13 +184,20 @@ INSTRUÇÕES:
 
 2. etiquetaTopLeilao: Verifique se existe alguma label cujo "name" contenha "Top Leilão" (ignore maiúsculas/minúsculas). Retorne "Ativada" ou "Não ativada".
 
-3. notificacoesEnviadas: Analise "phases_history" e conte quantas entradas possuem um "phase_name" que contenha a palavra "Quarentena" (ignore maiúsculas/minúsculas). Retorne o número (0 se nenhuma).
+3. notificacoesEnviadas: Conte o total de entradas em "phases_history" cujo "phase_name" contenha "Quarentena" (ignore maiúsculas/minúsculas). Retorne o número inteiro (0 se nenhuma).
 
 4. ultimaComunicacao: Encontre a data mais recente entre todos os "comments[].created_at". Converta para o formato DD/MM/AAAA. Retorne null se não houver comentários.
 
 5. retorno: Verifique se alguma label tem "name" contendo "Respondeu", "Respondido" ou "Confirmou a negativação" (ignore maiúsculas/minúsculas). Retorne "Sim" ou "Não".
 
-6. observacao: Escreva um resumo estratégico em PORTUGUÊS CORRETO com EXATAMENTE NO MÁXIMO 200 caracteres. Baseie-se apenas nos dados reais (comentários, etiquetas, fase atual). Destaque: trabalho realizado, canais utilizados, se houve retorno, período sem ocorrências. Se houver labels como "Hotline" ou "Prioridade", mencione como ponto positivo. NUNCA invente dados. Não cite ferramentas ou sistemas pelo nome.
+6. observacao: Escreva um resumo estratégico em PORTUGUÊS CORRETO com EXATAMENTE NO MÁXIMO 200 caracteres.
+- Se "reincidente" for true, comece OBRIGATORIAMENTE com "Agressor reincidente."
+- Baseie-se apenas nos dados reais (comentários, etiquetas, fase atual)
+- Destaque: trabalho realizado, canais utilizados, se houve retorno e quando, período sem ocorrências
+- Se houver labels como "Hotline" ou "Prioridade", mencione como ponto positivo
+- NUNCA mencione as palavras "quarentena" ou "ciclo"
+- NUNCA cite ferramentas, sistemas ou nomes de plataformas
+- NUNCA invente dados
 
 Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
 {

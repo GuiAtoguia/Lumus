@@ -2,22 +2,7 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import {
-  FileSearch,
-  Loader2,
-  ClipboardCopy,
-  Check,
-  Tag,
-  Bell,
-  Calendar,
-  MessageCircle,
-  Eye,
-  EyeOff,
-  RotateCcw,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { FileSearch, Loader2, ClipboardCopy, Check, Eye, EyeOff, RotateCcw } from "lucide-react";
 
 interface ResumoResult {
   nomeAgressor: string;
@@ -28,86 +13,17 @@ interface ResumoResult {
   observacao: string;
 }
 
-// ─── Copy Button ──────────────────────────────────────────────────────────────
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Erro ao copiar.");
-    }
-  }
-
+function CheckIcon() {
   return (
-    <button
-      onClick={handleCopy}
-      className="w-7 h-7 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all"
-      title="Copiar"
-    >
-      {copied ? <Check size={12} className="text-primary" /> : <ClipboardCopy size={12} />}
-    </button>
+    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 font-bold text-sm">✓</span>
   );
 }
 
-// ─── Result Field ─────────────────────────────────────────────────────────────
-
-function ResultField({
-  icon: Icon,
-  label,
-  value,
-  badge,
-  badgeColor,
-  mono,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  badge?: boolean;
-  badgeColor?: "green" | "yellow" | "red" | "blue";
-  mono?: boolean;
-}) {
-  const badgeClasses = {
-    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    yellow: "bg-amber-50 text-amber-700 border-amber-200",
-    red: "bg-red-50 text-red-600 border-red-200",
-    blue: "bg-primary/5 text-primary border-primary/20",
-  };
-
+function XIcon() {
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-border/50 last:border-0">
-      <div className="w-7 h-7 rounded-lg bg-primary/5 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={14} className="text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
-          {label}
-        </p>
-        {badge && badgeColor ? (
-          <span
-            className={cn(
-              "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold border",
-              badgeClasses[badgeColor]
-            )}
-          >
-            {value}
-          </span>
-        ) : (
-          <p className={cn("text-sm text-foreground leading-relaxed", mono && "font-mono")}>
-            {value}
-          </p>
-        )}
-      </div>
-      <CopyButton text={value} />
-    </div>
+    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-500 font-bold text-sm">✗</span>
   );
 }
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ResumoTratativaClient() {
   const [cardUrl, setCardUrl] = useState("");
@@ -115,6 +31,7 @@ export function ResumoTratativaClient() {
   const [showToken, setShowToken] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResumoResult | null>(null);
+  const [termos, setTermos] = useState("");
   const [copied, setCopied] = useState(false);
 
   async function handleGenerate() {
@@ -124,6 +41,7 @@ export function ResumoTratativaClient() {
     }
     setLoading(true);
     setResult(null);
+    setTermos("");
     try {
       const res = await fetch("/api/resumo-tratativa", {
         method: "POST",
@@ -144,24 +62,52 @@ export function ResumoTratativaClient() {
     }
   }
 
-  function buildFullText(r: ResumoResult) {
-    const lines = [
-      `Nome do Agressor: ${r.nomeAgressor}`,
-      `Etiqueta Top Leilão: ${r.etiquetaTopLeilao}`,
-      `Notificações Enviadas: ${r.notificacoesEnviadas}`,
-      `Última Comunicação: ${r.ultimaComunicacao ?? "—"}`,
-      `Retorno: ${r.retorno}`,
-      `Observação: ${r.observacao}`,
-    ];
-    return lines.join("\n");
+  function formatNotif(n: number): string {
+    return n > 10 ? "+10" : String(n);
   }
 
-  async function copyAll() {
+  async function copyTable() {
     if (!result) return;
+
+    const leilao = result.etiquetaTopLeilao === "Ativada";
+    const resposta = result.retorno === "Sim";
+    const notif = formatNotif(result.notificacoesEnviadas);
+    const ultima = result.ultimaComunicacao ?? "—";
+
+    const th = (text: string) =>
+      `<th style="padding:8px 12px;border:1px solid #cbd5e1;background:#0d3349;color:white;font-size:12px;white-space:nowrap;">${text}</th>`;
+    const td = (text: string, color?: string) =>
+      `<td style="padding:8px 12px;border:1px solid #cbd5e1;font-size:12px;vertical-align:middle;${color ? `color:${color};font-weight:bold;` : ""}">${text}</td>`;
+
+    const html = `<table style="border-collapse:collapse;font-family:Arial,sans-serif;">
+  <thead><tr>
+    ${th("Agressor")}${th("Termos atingidos")}${th("Concorrente (Leilão)")}${th("Notificações Enviadas")}${th("Última Notificação")}${th("Resposta")}${th("Observação")}
+  </tr></thead>
+  <tbody><tr>
+    ${td(result.nomeAgressor)}
+    ${td(termos || "—")}
+    ${td(leilao ? "✓" : "✗", leilao ? "#16a34a" : "#dc2626")}
+    ${td(notif)}
+    ${td(ultima)}
+    ${td(resposta ? "✓" : "✗", resposta ? "#16a34a" : "#dc2626")}
+    ${td(result.observacao)}
+  </tr></tbody>
+</table>`;
+
+    const plain = [
+      "Agressor\tTermos atingidos\tConcorrente (Leilão)\tNotificações Enviadas\tÚltima Notificação\tResposta\tObservação",
+      `${result.nomeAgressor}\t${termos || "—"}\t${leilao ? "✓" : "✗"}\t${notif}\t${ultima}\t${resposta ? "✓" : "✗"}\t${result.observacao}`,
+    ].join("\n");
+
     try {
-      await navigator.clipboard.writeText(buildFullText(result));
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plain], { type: "text/plain" }),
+        }),
+      ]);
       setCopied(true);
-      toast.success("Resumo completo copiado!");
+      toast.success("Tabela copiada! Cole no Google Slides.");
       setTimeout(() => setCopied(false), 2500);
     } catch {
       toast.error("Erro ao copiar.");
@@ -171,12 +117,13 @@ export function ResumoTratativaClient() {
   function reset() {
     setResult(null);
     setCardUrl("");
+    setTermos("");
   }
 
   return (
     <div className="flex flex-col flex-1 bg-background overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-2xl mx-auto space-y-5">
+        <div className="max-w-5xl mx-auto space-y-5">
 
           {/* Input card */}
           <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-4">
@@ -195,7 +142,6 @@ export function ResumoTratativaClient() {
               />
             </div>
 
-            {/* Token field */}
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1.5">
                 Token pessoal da API do Pipefy{" "}
@@ -241,18 +187,16 @@ export function ResumoTratativaClient() {
             </button>
           </div>
 
-          {/* Result card */}
+          {/* Result table */}
           {result && (
             <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-              {/* Result header */}
+              {/* Header */}
               <div className="bg-[#0d3349] px-5 py-3.5 flex items-center justify-between">
                 <div>
                   <p className="text-white/60 text-[10px] font-medium uppercase tracking-wider">
                     Branddi Monitor
                   </p>
-                  <h2 className="text-white font-bold text-sm mt-0.5">
-                    Resumo de Tratativa
-                  </h2>
+                  <h2 className="text-white font-bold text-sm mt-0.5">Resumo de Tratativa</h2>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -264,89 +208,67 @@ export function ResumoTratativaClient() {
                     Nova consulta
                   </button>
                   <button
-                    onClick={copyAll}
+                    onClick={copyTable}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/15 hover:bg-white/25 transition-all border border-white/20"
                   >
                     {copied ? <Check size={11} /> : <ClipboardCopy size={11} />}
-                    {copied ? "Copiado!" : "Copiar tudo"}
+                    {copied ? "Copiado!" : "Copiar tabela"}
                   </button>
                 </div>
               </div>
 
-              {/* Fields */}
-              <div className="px-5 py-1 divide-y divide-border/0">
-                <ResultField
-                  icon={FileSearch}
-                  label="Nome do Agressor"
-                  value={result.nomeAgressor}
-                  mono
-                />
-                <ResultField
-                  icon={Tag}
-                  label="Etiqueta Top Leilão"
-                  value={result.etiquetaTopLeilao}
-                  badge
-                  badgeColor={result.etiquetaTopLeilao === "Ativada" ? "yellow" : "blue"}
-                />
-                <ResultField
-                  icon={Bell}
-                  label="Notificações Enviadas"
-                  value={String(result.notificacoesEnviadas)}
-                />
-                <ResultField
-                  icon={Calendar}
-                  label="Última Comunicação"
-                  value={result.ultimaComunicacao ?? "—"}
-                />
-                <ResultField
-                  icon={MessageCircle}
-                  label="Retorno"
-                  value={result.retorno}
-                  badge
-                  badgeColor={result.retorno === "Sim" ? "green" : "red"}
-                />
-
-                {/* Observação com contador */}
-                <div className="flex items-start gap-3 py-3">
-                  <div className="w-7 h-7 rounded-lg bg-primary/5 flex items-center justify-center shrink-0 mt-0.5">
-                    <FileSearch size={14} className="text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                        Observação
-                      </p>
-                      <span
-                        className={cn(
-                          "text-[10px] font-medium",
-                          result.observacao.length > 200
-                            ? "text-red-500"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {result.observacao.length}/200
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground leading-relaxed">{result.observacao}</p>
-                    {result.observacao.length > 200 && (
-                      <p className="text-xs text-red-500 mt-1">
-                        Atenção: observação excede 200 caracteres. Edite antes de usar.
-                      </p>
-                    )}
-                  </div>
-                  <CopyButton text={result.observacao} />
-                </div>
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-border">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Agressor</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Termos atingidos</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Concorrente (Leilão)</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Notificações Enviadas</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Última Notificação</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Resposta</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Observação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="px-4 py-4 font-medium text-foreground whitespace-nowrap align-top">{result.nomeAgressor}</td>
+                      <td className="px-4 py-4 align-top">
+                        <input
+                          type="text"
+                          value={termos}
+                          onChange={(e) => setTermos(e.target.value)}
+                          placeholder="Preencher manualmente"
+                          className="w-full min-w-[140px] text-sm border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                        />
+                      </td>
+                      <td className="px-4 py-4 text-center align-top">
+                        {result.etiquetaTopLeilao === "Ativada" ? <CheckIcon /> : <XIcon />}
+                      </td>
+                      <td className="px-4 py-4 text-center font-semibold text-foreground align-top">
+                        {formatNotif(result.notificacoesEnviadas)}
+                      </td>
+                      <td className="px-4 py-4 text-center text-foreground whitespace-nowrap align-top">
+                        {result.ultimaComunicacao ?? "—"}
+                      </td>
+                      <td className="px-4 py-4 text-center align-top">
+                        {result.retorno === "Sim" ? <CheckIcon /> : <XIcon />}
+                      </td>
+                      <td className="px-4 py-4 text-foreground leading-relaxed align-top max-w-xs">
+                        <p>{result.observacao}</p>
+                        <span className={`text-[10px] mt-1 block ${result.observacao.length > 200 ? "text-red-500" : "text-muted-foreground"}`}>
+                          {result.observacao.length}/200 chars
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              {/* Raw text preview */}
-              <details className="border-t border-border">
-                <summary className="px-5 py-3 text-xs font-medium cursor-pointer hover:bg-slate-50 text-muted-foreground select-none">
-                  Ver texto formatado para colar
-                </summary>
-                <pre className="px-5 py-3 text-xs font-mono bg-slate-50 whitespace-pre-wrap border-t border-border text-foreground">
-                  {buildFullText(result)}
-                </pre>
-              </details>
+              <p className="px-5 py-3 text-xs text-muted-foreground border-t border-border">
+                Preencha os <strong>Termos atingidos</strong> manualmente e clique em <strong>Copiar tabela</strong> para colar no Google Slides.
+              </p>
             </div>
           )}
 
