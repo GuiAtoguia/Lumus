@@ -15,13 +15,13 @@ interface ResumoResult {
 
 function CheckIcon() {
   return (
-    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 font-bold text-sm">✓</span>
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white font-bold text-base" style={{ background: "#2abfbf" }}>✓</span>
   );
 }
 
 function XIcon() {
   return (
-    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-500 font-bold text-sm">✗</span>
+    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-400 text-white font-bold text-base">✗</span>
   );
 }
 
@@ -190,26 +190,23 @@ export function ResumoTratativaClient() {
           {/* Result table */}
           {result && (
             <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="bg-[#0d3349] px-5 py-3.5 flex items-center justify-between">
-                <div>
-                  <p className="text-white/60 text-[10px] font-medium uppercase tracking-wider">
-                    Branddi Monitor
-                  </p>
-                  <h2 className="text-white font-bold text-sm mt-0.5">Resumo de Tratativa</h2>
-                </div>
-                <div className="flex gap-2">
+              {/* Actions bar */}
+              <div className="px-5 py-3 flex items-center justify-between border-b border-border bg-slate-50">
+                <p className="text-xs text-muted-foreground">
+                  Preencha os <strong>Termos atingidos</strong> e clique em <strong>Copiar tabela</strong> para colar no Google Slides.
+                </p>
+                <div className="flex gap-2 shrink-0 ml-4">
                   <button
                     onClick={reset}
-                    title="Nova consulta"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 transition-all border border-white/20"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white transition-all border border-border"
                   >
                     <RotateCcw size={11} />
                     Nova consulta
                   </button>
                   <button
                     onClick={copyTable}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-white/15 hover:bg-white/25 transition-all border border-white/20"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all"
+                    style={{ background: "#2abfbf" }}
                   >
                     {copied ? <Check size={11} /> : <ClipboardCopy size={11} />}
                     {copied ? "Copiado!" : "Copiar tabela"}
@@ -221,54 +218,52 @@ export function ResumoTratativaClient() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-border">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Agressor</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Termos atingidos</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Concorrente (Leilão)</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Notificações Enviadas</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Última Notificação</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Resposta</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Observação</th>
+                    <tr className="border-b-2" style={{ borderColor: "#e2e8f0" }}>
+                      {["Agressor", "Termos atingidos", "Concorrente\n(Leilão)", "Notificações\nEnviadas", "Última\nNotificação", "Resposta", "Observação"].map((h) => (
+                        <th
+                          key={h}
+                          className="px-4 py-4 text-center text-sm font-semibold whitespace-pre-line"
+                          style={{ color: "#2abfbf" }}
+                        >
+                          {h}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="px-4 py-4 font-medium text-foreground whitespace-nowrap align-top">{result.nomeAgressor}</td>
-                      <td className="px-4 py-4 align-top">
+                    <tr className="border-b border-slate-100">
+                      <td className="px-4 py-5 text-center text-sm text-foreground">{result.nomeAgressor}</td>
+                      <td className="px-4 py-5 text-center">
                         <input
                           type="text"
                           value={termos}
                           onChange={(e) => setTermos(e.target.value)}
-                          placeholder="Preencher manualmente"
-                          className="w-full min-w-[140px] text-sm border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                          placeholder="term1, term2"
+                          className="w-full min-w-[120px] text-sm text-center border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:border-[#2abfbf] bg-white"
                         />
                       </td>
-                      <td className="px-4 py-4 text-center align-top">
+                      <td className="px-4 py-5 text-center">
                         {result.etiquetaTopLeilao === "Ativada" ? <CheckIcon /> : <XIcon />}
                       </td>
-                      <td className="px-4 py-4 text-center font-semibold text-foreground align-top">
+                      <td className="px-4 py-5 text-center font-semibold text-foreground">
                         {formatNotif(result.notificacoesEnviadas)}
                       </td>
-                      <td className="px-4 py-4 text-center text-foreground whitespace-nowrap align-top">
+                      <td className="px-4 py-5 text-center text-foreground whitespace-nowrap">
                         {result.ultimaComunicacao ?? "—"}
                       </td>
-                      <td className="px-4 py-4 text-center align-top">
+                      <td className="px-4 py-5 text-center">
                         {result.retorno === "Sim" ? <CheckIcon /> : <XIcon />}
                       </td>
-                      <td className="px-4 py-4 text-foreground leading-relaxed align-top max-w-xs">
+                      <td className="px-4 py-5 text-center text-foreground leading-relaxed max-w-xs">
                         <p>{result.observacao}</p>
                         <span className={`text-[10px] mt-1 block ${result.observacao.length > 200 ? "text-red-500" : "text-muted-foreground"}`}>
-                          {result.observacao.length}/200 chars
+                          {result.observacao.length}/200
                         </span>
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-
-              <p className="px-5 py-3 text-xs text-muted-foreground border-t border-border">
-                Preencha os <strong>Termos atingidos</strong> manualmente e clique em <strong>Copiar tabela</strong> para colar no Google Slides.
-              </p>
             </div>
           )}
 
