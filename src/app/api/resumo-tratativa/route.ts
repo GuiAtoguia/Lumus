@@ -139,11 +139,13 @@ export async function POST(request: NextRequest) {
       return hasTopLeilao && !isOff;
     }) ? "Sim" : "Não";
 
-    // Notificações: conta quantas vezes o card foi para fase de quarentena no histórico
-    const quarentenaPhases = phasesHistory.filter((h) =>
-      h.phase?.name?.toLowerCase().includes("quarentena")
-    );
-    const notificacoesEnviadas: number = quarentenaPhases.length;
+    // Notificações: conta fases de "Tentativa" (excluindo "Quarentena")
+    // Ex: "N1. 1a Tentativa", "N2. 1a Tentativa" = 1 notificação cada
+    // "N1. Quarentena - 1a Tentativa" = período de espera, não conta
+    const notificacoesEnviadas: number = phasesHistory.filter((h) => {
+      const name = h.phase?.name?.toLowerCase() ?? "";
+      return name.includes("tentativa") && !name.includes("quarentena");
+    }).length;
 
     // Debug: nomes de todas as fases retornadas pelo Pipefy
     const _debugPhases = phasesHistory.map((h) => h.phase?.name ?? "?");
@@ -234,7 +236,7 @@ Realizada 3ª tentativa de comunicação. Agressor reincidente; recebemos retorn
     return NextResponse.json({
       success: true,
       data: { nomeAgressor, etiquetaTopLeilao, notificacoesEnviadas, ultimaComunicacao, retorno, observacao },
-      _debug: { phases: _debugPhases, quarentenaCount: quarentenaPhases.length },
+      _debug: { phases: _debugPhases, notificacoesCount: notificacoesEnviadas },
     });
   } catch (error) {
     console.error("resumo-tratativa error:", error);
