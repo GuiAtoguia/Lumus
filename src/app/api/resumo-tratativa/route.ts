@@ -129,41 +129,16 @@ export async function POST(request: NextRequest) {
 
     const labelNames: string[] = (card.labels ?? []).map((l: { name: string }) => l.name);
     const phasesHistory: { phase: { name: string }; firstTimeIn: string }[] = card.phases_history ?? [];
-    const cardFields: { field: { id: string; label: string; type: string }; value: string }[] = card.fields ?? [];
-
     const nomeAgressor: string = card.title ?? "";
 
     const etiquetaTopLeilao: "Sim" | "Não" = labelNames.some((l) =>
       l.toLowerCase().includes("top leilão") || l.toLowerCase().includes("top leilao")
     ) ? "Sim" : "Não";
 
-    // Notificações: 1) campo numérico do card, 2) fases, 3) comentários com menção a notificação
-    const notifNumField = cardFields.find(
-      (f) =>
-        /notifica[çc][aã]o|n[uú]mero.*contato|contato.*n[uú]mero|qtd|quantidade/i.test(f.field?.label ?? "") &&
-        /^\d+$/.test((f.value ?? "").trim())
-    );
-
-    let notificacoesEnviadas: number;
-    if (notifNumField) {
-      notificacoesEnviadas = parseInt(notifNumField.value.trim(), 10);
-    } else {
-      // Conta entradas de fases de notificação (cada visita à fase = 1 notificação)
-      const notifTerms = ["quarentena", "notif", "aguardando retorno", "enviado"];
-      const byPhase = phasesHistory.filter((h) =>
-        notifTerms.some((t) => h.phase?.name?.toLowerCase().includes(t))
-      ).length;
-
-      if (byPhase > 0) {
-        notificacoesEnviadas = byPhase;
-      } else {
-        // Fallback: conta comentários que registram envio de notificação
-        const notifCommentRe = /notifica[çc][aã]o\s*\d+|^\d+[aª°]\s*notifica|enviamos|email enviado|contato\s+via/i;
-        notificacoesEnviadas = (card.comments ?? []).filter(
-          (c: { text: string }) => notifCommentRe.test(c.text)
-        ).length;
-      }
-    }
+    // Notificações: conta quantas vezes o card foi para fase de quarentena no histórico
+    const notificacoesEnviadas: number = phasesHistory.filter((h) =>
+      h.phase?.name?.toLowerCase().includes("quarentena")
+    ).length;
 
     const sortedComments = [...(card.comments ?? [])].sort(
       (a: { created_at: string }, b: { created_at: string }) =>
@@ -185,14 +160,6 @@ export async function POST(request: NextRequest) {
       h.phase?.name?.toLowerCase().includes("sucesso")
     );
 
-    const hasHotline = labelNames.some((l) =>
-      l.toLowerCase().includes("hotline") || l.toLowerCase().includes("prioridade")
-    );
-
-    const hasNE = sortedComments.some((c: { text: string }) =>
-      /notifica[çc][aã]o extrajudicial|ne branddi|\bne\b/i.test(c.text)
-    );
-
     const recentComments = sortedComments
       .slice(0, 6)
       .map(
@@ -204,35 +171,30 @@ export async function POST(request: NextRequest) {
     // ── Groq: apenas para a observação ───────────────────────────────────────
 
     const prompt = `Você é um analista da Branddi Monitor especializado em brand bidding.
-Escreva APENAS o campo "observacao" para um resumo de tratativa.
+Escreva APENAS o campo "observacao": um resumo das tratativas mais recentes com o agressor.
 
-DADOS VERIFICADOS DO CARD:
+CONTEXTO:
 - Agressor: ${nomeAgressor}
 - Fase atual: ${card.current_phase?.name ?? "—"}
-- Etiquetas ativas: ${labelNames.join(", ") || "nenhuma"}
-- Reincidente (voltou após sucesso): ${reincidente ? "SIM" : "NÃO"}
-- Hotline ou Prioridade ativo: ${hasHotline ? "SIM" : "NÃO — NÃO EXISTE hotline neste caso"}
-- NE (Notificação Extrajudicial) enviada: ${hasNE ? "SIM" : "NÃO"}
-- Retorno do agressor: ${retorno === "Sim" ? "SIM — o agressor respondeu" : "NÃO — o agressor NÃO respondeu"}
-- Comentários recentes:
+- Reincidente: ${reincidente ? "SIM" : "NÃO"}
+- Retorno do agressor: ${retorno === "Sim" ? "SIM — respondeu" : "NÃO — não respondeu"}
+- Comentários recentes (fonte principal do resumo):
 ${recentComments || "Nenhum comentário"}
 
-REGRAS ABSOLUTAS (violação = resposta inválida):
-${reincidente ? '1. INICIE com "Agressor reincidente."' : "1. NÃO mencione reincidência"}
-2. Máximo 200 caracteres
-3. Mencione APENAS o canal identificado nos comentários acima (email, LinkedIn, telefone)
-4. ${retorno === "Sim" ? "Mencione que o agressor respondeu e o que foi dito" : "JAMAIS diga que o agressor respondeu, retornou ou confirmou algo — ele NÃO respondeu"}
-5. ${hasHotline ? "Mencione Hotline/Prioridade como ponto positivo" : "JAMAIS mencione hotline, prioridade ou canal diferenciado — este caso NÃO TEM hotline"}
-6. ${hasNE ? 'Mencione "tratativa em tom mais formal" ao referir a NE' : ""}
-7. JAMAIS escreva "quarentena" ou "ciclo"
-8. JAMAIS invente datas, eventos ou informações que não estejam nos comentários acima
-9. Linguagem profissional, direta. Sem frases genéricas como "aguardando retorno" sem contexto
-10. Uma linha apenas, sem aspas, sem JSON, sem explicações extras
+REGRAS:
+${reincidente ? '- INICIE com "Agressor reincidente."' : "- NÃO mencione reincidência"}
+- Máximo 200 caracteres
+- Resuma o que REALMENTE aconteceu nas tratativas, com base nos comentários acima
+- Mencione o canal (email, LinkedIn, telefone) se identificado nos comentários
+- ${retorno === "Sim" ? "Inclua que o agressor respondeu e o que foi dito" : "NÃO diga que o agressor respondeu — ele NÃO respondeu"}
+- JAMAIS invente dados, datas ou eventos que não apareçam nos comentários
+- JAMAIS escreva "quarentena" ou "ciclo"
+- Uma linha apenas, sem aspas, sem JSON, sem explicações extras
 
-Exemplos de formato correto:
-Abordagem direcionada aos e-mails mapeados. Sem novas ocorrências desde a última ação.
-O contato demonstrou receptividade e solicitou evidências. Material enviado, aguardando confirmação.
-Agressor reincidente. Recontato realizado via LinkedIn. Sem resposta até o momento.`;
+Exemplos:
+Abordagem por e-mail e LinkedIn. Solicitou evidências; material enviado, aguardando confirmação.
+Agressor reincidente. Três contatos por e-mail sem retorno. Sem novas ocorrências após ações.
+Contato via e-mail realizado. Sem resposta até o momento.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
