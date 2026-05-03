@@ -131,9 +131,11 @@ export async function POST(request: NextRequest) {
     const phasesHistory: { phase: { name: string }; firstTimeIn: string }[] = card.phases_history ?? [];
     const nomeAgressor: string = card.title ?? "";
 
-    const etiquetaTopLeilao: "Sim" | "Não" = labelNames.some((l) =>
-      l.toLowerCase().includes("top leilão") || l.toLowerCase().includes("top leilao")
-    ) ? "Sim" : "Não";
+    // "top leilão off" = inativo; só conta se NÃO tiver "off" na mesma etiqueta
+    const etiquetaTopLeilao: "Sim" | "Não" = labelNames.some((l) => {
+      const lower = l.toLowerCase();
+      return (lower.includes("top leilão") || lower.includes("top leilao")) && !lower.includes("off");
+    }) ? "Sim" : "Não";
 
     // Notificações: conta quantas vezes o card foi para fase de quarentena no histórico
     const notificacoesEnviadas: number = phasesHistory.filter((h) =>
@@ -171,29 +173,31 @@ export async function POST(request: NextRequest) {
     // ── Groq: apenas para a observação ───────────────────────────────────────
 
     const prompt = `Você é um analista da Branddi Monitor especializado em brand bidding.
-Escreva APENAS o campo "observacao": um resumo das tratativas mais recentes com o agressor.
+Escreva APENAS o campo "observacao": um resumo estratégico das tratativas recentes.
 
 CONTEXTO:
 - Agressor: ${nomeAgressor}
-- Fase atual: ${card.current_phase?.name ?? "—"}
 - Reincidente: ${reincidente ? "SIM" : "NÃO"}
 - Retorno do agressor: ${retorno === "Sim" ? "SIM — respondeu" : "NÃO — não respondeu"}
-- Comentários recentes (fonte principal do resumo):
+- Comentários recentes (fonte do resumo):
 ${recentComments || "Nenhum comentário"}
 
 REGRAS:
 ${reincidente ? '- INICIE com "Agressor reincidente."' : "- NÃO mencione reincidência"}
 - Máximo 200 caracteres
-- Resuma o que REALMENTE aconteceu nas tratativas, com base nos comentários acima
-- Mencione o canal (email, LinkedIn, telefone) se identificado nos comentários
-- ${retorno === "Sim" ? "Inclua que o agressor respondeu e o que foi dito" : "NÃO diga que o agressor respondeu — ele NÃO respondeu"}
-- JAMAIS invente dados, datas ou eventos que não apareçam nos comentários
+- Resuma o que aconteceu nas tratativas (canal usado, resultado, próximo passo)
+- Mencione o canal (e-mail, LinkedIn, telefone) se identificado nos comentários
+- ${retorno === "Sim" ? "Inclua que o agressor respondeu e o que foi discutido" : "NÃO diga que o agressor respondeu — ele NÃO respondeu"}
+- JAMAIS mencione endereços de e-mail ou nomes de pessoas
+- JAMAIS mencione número de notificações enviadas ou tentativas
+- JAMAIS mencione o nome de fases do processo
+- JAMAIS invente dados ou eventos que não estejam nos comentários acima
 - JAMAIS escreva "quarentena" ou "ciclo"
 - Uma linha apenas, sem aspas, sem JSON, sem explicações extras
 
 Exemplos:
-Abordagem por e-mail e LinkedIn. Solicitou evidências; material enviado, aguardando confirmação.
-Agressor reincidente. Três contatos por e-mail sem retorno. Sem novas ocorrências após ações.
+Abordagem por e-mail e LinkedIn. Agressor solicitou evidências; material enviado, aguardando confirmação.
+Agressor reincidente. Contatos por e-mail sem retorno. Sem novas ocorrências após as ações.
 Contato via e-mail realizado. Sem resposta até o momento.`;
 
     const groqRes = await fetch(GROQ_API, {
