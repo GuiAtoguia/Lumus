@@ -131,10 +131,12 @@ export async function POST(request: NextRequest) {
     const phasesHistory: { phase: { name: string }; firstTimeIn: string }[] = card.phases_history ?? [];
     const nomeAgressor: string = card.title ?? "";
 
-    // "top leilão off" = inativo; só conta se NÃO tiver "off" na mesma etiqueta
+    // "top leilão off" ou "top leilão - off" = inativo; só ativo se SEM "off"/"inativo"
     const etiquetaTopLeilao: "Sim" | "Não" = labelNames.some((l) => {
-      const lower = l.toLowerCase();
-      return (lower.includes("top leilão") || lower.includes("top leilao")) && !lower.includes("off");
+      const lower = l.toLowerCase().replace(/[-–_]/g, " ");
+      const hasTopLeilao = lower.includes("top leilão") || lower.includes("top leilao");
+      const isOff = lower.includes("off") || lower.includes("inativo") || lower.includes("inativa");
+      return hasTopLeilao && !isOff;
     }) ? "Sim" : "Não";
 
     // Notificações: conta quantas vezes o card foi para fase de quarentena no histórico
@@ -172,33 +174,33 @@ export async function POST(request: NextRequest) {
 
     // ── Groq: apenas para a observação ───────────────────────────────────────
 
-    const prompt = `Você é um analista da Branddi Monitor especializado em brand bidding.
-Escreva APENAS o campo "observacao": um resumo estratégico das tratativas recentes.
+    const prompt = `Você é um analista da Branddi Monitor escrevendo o campo "observacao".
+Conte uma breve narrativa da tratativa em primeira pessoa do plural (nós = time Branddi Monitor).
 
-CONTEXTO:
+CONTEXTO DO CARD:
 - Agressor: ${nomeAgressor}
 - Reincidente: ${reincidente ? "SIM" : "NÃO"}
-- Retorno do agressor: ${retorno === "Sim" ? "SIM — respondeu" : "NÃO — não respondeu"}
-- Comentários recentes (fonte do resumo):
+- Retorno do agressor: ${retorno === "Sim" ? "SIM — o agressor respondeu" : "NÃO — o agressor não respondeu"}
+- Comentários recentes (use para extrair datas, canal e ações realizadas):
 ${recentComments || "Nenhum comentário"}
 
 REGRAS:
-${reincidente ? '- INICIE com "Agressor reincidente."' : "- NÃO mencione reincidência"}
 - Máximo 200 caracteres
-- Resuma o que aconteceu nas tratativas (canal usado, resultado, próximo passo)
-- Mencione o canal (e-mail, LinkedIn, telefone) se identificado nos comentários
-- ${retorno === "Sim" ? "Inclua que o agressor respondeu e o que foi discutido" : "NÃO diga que o agressor respondeu — ele NÃO respondeu"}
-- JAMAIS mencione endereços de e-mail ou nomes de pessoas
-- JAMAIS mencione número de notificações enviadas ou tentativas
-- JAMAIS mencione o nome de fases do processo
-- JAMAIS invente dados ou eventos que não estejam nos comentários acima
-- JAMAIS escreva "quarentena" ou "ciclo"
-- Uma linha apenas, sem aspas, sem JSON, sem explicações extras
+- Mencione a data da ação mais recente (ex: "em 20/04/2026"), o canal (e-mail, hotline, LinkedIn) e o status
+- ${retorno === "Sim" ? "Mencione que recebemos retorno do agressor" : "Mencione que não houve retorno"}
+- ${reincidente ? "Mencione que o agressor é reincidente" : "NÃO mencione reincidência"}
+- JAMAIS mencione endereços de e-mail, nomes de pessoas ou domínios completos
+- JAMAIS invente datas ou ações que não apareçam nos comentários
+- JAMAIS mencione o que foi discutido em detalhes (produto, marca, termo)
+- JAMAIS escreva "quarentena"
+- Uma frase ou duas, sem aspas, sem JSON
 
-Exemplos:
-Abordagem por e-mail e LinkedIn. Agressor solicitou evidências; material enviado, aguardando confirmação.
-Agressor reincidente. Contatos por e-mail sem retorno. Sem novas ocorrências após as ações.
-Contato via e-mail realizado. Sem resposta até o momento.`;
+EXEMPLOS (siga este estilo exato):
+Em 26/01, foi enviado e-mail à equipe responsável solicitando negativação, com envio de evidências. Aguardamos retorno.
+Nova tentativa de contato enviada em 20/04/2026. Sem retorno, mantendo atenção no caso e monitorando as ocorrências.
+Efetuada nova tentativa com hotline em 17/04/2026. Nosso time realiza regarimpo para nova tentativa.
+Foi realizada a primeira tentativa de contato via e-mail ao contato garimpado. Ainda não tivemos retorno.
+Realizada 3ª tentativa de comunicação. Agressor reincidente; recebemos retorno e nosso time se prepara para próximo ciclo.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
