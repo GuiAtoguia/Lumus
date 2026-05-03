@@ -8,19 +8,8 @@ const CARD_QUERY = `
     card(id: $id) {
       id
       title
-      done
-      created_at
-      updated_at
-      due_date
-      current_phase {
-        id
-        name
-      }
-      labels {
-        id
-        name
-        color
-      }
+      current_phase { id name }
+      labels { id name color }
       comments {
         id
         text
@@ -36,7 +25,6 @@ const CARD_QUERY = `
       fields {
         field { id label type }
         value
-        array_value
         date_value
       }
     }
@@ -54,12 +42,9 @@ async function fetchCard(cardId: string, token: string) {
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    throw new Error(`Pipefy API: ${res.status} ${res.statusText}`);
-  }
+  if (!res.ok) throw new Error(`Pipefy API: ${res.status} ${res.statusText}`);
 
   const json = await res.json();
-
   if (json.errors?.length) {
     const msg = json.errors.map((e: { message: string }) => e.message).join("; ");
     throw new Error(`Pipefy GraphQL: ${msg}`);
@@ -83,21 +68,23 @@ function parseCardId(url: string): string {
   );
 }
 
+function formatDate(isoString: string): string {
+  const d = new Date(isoString);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cardUrl, pipefyToken } = body as {
-      cardUrl: string;
-      pipefyToken?: string;
-    };
+    const { cardUrl, pipefyToken } = body as { cardUrl: string; pipefyToken?: string };
 
     const token = pipefyToken?.trim() || process.env.PIPEFY_API_TOKEN || "";
     if (!token) {
       return NextResponse.json(
-        {
-          error:
-            "Token do Pipefy não configurado. Insira seu token pessoal ou configure PIPEFY_API_TOKEN no .env.local.",
-        },
+        { error: "Token do Pipefy não configurado." },
         { status: 400 }
       );
     }
@@ -120,94 +107,107 @@ export async function POST(request: NextRequest) {
     try {
       card = await fetchCard(cardId, token);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao buscar card.";
-      return NextResponse.json({ error: msg }, { status: 502 });
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Erro ao buscar card." },
+        { status: 502 }
+      );
     }
 
     if (!card) {
       return NextResponse.json(
-        {
-          error: "Card não encontrado. Verifique a URL e se o token tem acesso a esse card.",
-        },
+        { error: "Card não encontrado. Verifique a URL e se o token tem acesso a esse card." },
         { status: 404 }
       );
     }
 
     const groqKey = process.env.GROQ_API_KEY || "";
     if (!groqKey) {
-      return NextResponse.json(
-        { error: "GROQ_API_KEY não configurada." },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "GROQ_API_KEY não configurada." }, { status: 500 });
     }
 
-    // Sort comments newest first
+    // ── Campos determinísticos (código puro, sem IA) ──────────────────────────
+
+    const labelNames: string[] = (card.labels ?? []).map((l: { name: string }) => l.name);
+    const phasesHistory: { phase: { name: string }; firstTimeIn: string }[] = card.phases_history ?? [];
+
+    const nomeAgressor: string = card.title ?? "";
+
+    const etiquetaTopLeilao: "Sim" | "Não" = labelNames.some((l) =>
+      l.toLowerCase().includes("top leilão") || l.toLowerCase().includes("top leilao")
+    ) ? "Sim" : "Não";
+
+    const notificacoesEnviadas: number = phasesHistory.filter((h) =>
+      h.phase?.name?.toLowerCase().includes("quarentena")
+    ).length;
+
     const sortedComments = [...(card.comments ?? [])].sort(
       (a: { created_at: string }, b: { created_at: string }) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
-    const reincidente = (card.phases_history ?? []).some(
-      (h: { phase: { name: string } }) =>
-        h.phase?.name?.toLowerCase().includes("sucesso")
+    const ultimaComunicacao: string | null =
+      sortedComments.length > 0 ? formatDate(sortedComments[0].created_at) : null;
+
+    const retorno: "Sim" | "Não" = labelNames.some((l) =>
+      ["respondeu", "respondido", "confirmou a negativação"].some((t) =>
+        l.toLowerCase().includes(t)
+      )
+    ) ? "Sim" : "Não";
+
+    // ── Contexto extra para a observação ─────────────────────────────────────
+
+    const reincidente = phasesHistory.some((h) =>
+      h.phase?.name?.toLowerCase().includes("sucesso")
     );
 
-    const context = {
-      title: card.title,
-      current_phase: card.current_phase?.name ?? null,
-      reincidente,
-      labels: (card.labels ?? []).map((l: { name: string }) => l.name),
-      comments: sortedComments
-        .slice(0, 6)
-        .map((c: { text: string; created_at: string; author?: { name: string } }) => ({
-          text: c.text.slice(0, 200),
-          created_at: c.created_at,
-          author: c.author?.name ?? "—",
-        })),
-      phases_history: (card.phases_history ?? []).map(
-        (h: { phase: { name: string }; firstTimeIn: string }) => ({
-          phase_name: h.phase?.name,
-          firstTimeIn: h.firstTimeIn,
-        })
-      ),
-    };
+    const hasHotline = labelNames.some((l) =>
+      l.toLowerCase().includes("hotline") || l.toLowerCase().includes("prioridade")
+    );
 
-    const prompt = `Você é um analista da Branddi Monitor especializado em negativações de marca (brand bidding).
-Analise os dados abaixo de um card do Pipefy e preencha cada campo com precisão.
+    const hasNE = sortedComments.some((c: { text: string }) =>
+      /notifica[çc][aã]o extrajudicial|ne branddi|\bne\b/i.test(c.text)
+    );
+
+    const recentComments = sortedComments
+      .slice(0, 6)
+      .map(
+        (c: { text: string; created_at: string; author?: { name: string } }) =>
+          `[${c.created_at.slice(0, 10)}] ${c.author?.name ?? "—"}: ${c.text.slice(0, 180)}`
+      )
+      .join("\n");
+
+    // ── Groq: apenas para a observação ───────────────────────────────────────
+
+    const prompt = `Você é um analista da Branddi Monitor especializado em brand bidding.
+Escreva APENAS o campo "observacao" para um resumo de tratativa.
 
 DADOS DO CARD:
-${JSON.stringify(context, null, 2)}
+- Agressor: ${nomeAgressor}
+- Fase atual: ${card.current_phase?.name ?? "—"}
+- Etiquetas ativas: ${labelNames.join(", ") || "nenhuma"}
+- Reincidente (voltou após sucesso): ${reincidente}
+- Hotline ou Prioridade ativo: ${hasHotline}
+- NE (Notificação Extrajudicial) enviada: ${hasNE}
+- Retorno do agressor: ${retorno}
+- Comentários recentes:
+${recentComments || "Nenhum comentário"}
 
-INSTRUÇÕES:
+REGRAS (siga todas sem exceção):
+${reincidente ? '- INICIE com "Agressor reincidente."' : "- Não mencione reincidência"}
+- Máximo 200 caracteres
+- Mencione o canal (email, hotline, LinkedIn) se identificado nos comentários
+- Se retorno = Sim, mencione quando e o que foi respondido
+${hasHotline ? "- Mencione Hotline/Prioridade como ponto positivo" : ""}
+${hasNE ? '- Mencione "tratativa em tom mais formal" ao referir a NE' : ""}
+- JAMAIS escreva "quarentena" ou "ciclo"
+- JAMAIS invente dados
+- Linguagem profissional, direta, estratégica. Sem frases genéricas
+- Uma linha apenas, sem aspas, sem JSON, sem explicações extras
 
-1. nomeAgressor: Use exatamente o valor de "title".
-
-2. etiquetaTopLeilao: Verifique se existe alguma label cujo "name" contenha "Top Leilão" (ignore maiúsculas/minúsculas). Retorne "Ativada" ou "Não ativada".
-
-3. notificacoesEnviadas: Conte o total de entradas em "phases_history" cujo "phase_name" contenha "Quarentena" (ignore maiúsculas/minúsculas). Retorne o número inteiro (0 se nenhuma).
-
-4. ultimaComunicacao: Encontre a data mais recente entre todos os "comments[].created_at". Converta para o formato DD/MM/AAAA. Retorne null se não houver comentários.
-
-5. retorno: Verifique se alguma label tem "name" contendo "Respondeu", "Respondido" ou "Confirmou a negativação" (ignore maiúsculas/minúsculas). Retorne "Sim" ou "Não".
-
-6. observacao: Escreva um resumo estratégico em PORTUGUÊS CORRETO com EXATAMENTE NO MÁXIMO 200 caracteres.
-- Se "reincidente" for true, comece OBRIGATORIAMENTE com "Agressor reincidente."
-- Baseie-se apenas nos dados reais (comentários, etiquetas, fase atual)
-- Destaque: trabalho realizado, canais utilizados, se houve retorno e quando, período sem ocorrências
-- Se houver labels como "Hotline" ou "Prioridade", mencione como ponto positivo
-- NUNCA mencione as palavras "quarentena" ou "ciclo"
-- NUNCA cite ferramentas, sistemas ou nomes de plataformas
-- NUNCA invente dados
-
-Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
-{
-  "nomeAgressor": "string",
-  "etiquetaTopLeilao": "Ativada" | "Não ativada",
-  "notificacoesEnviadas": number,
-  "ultimaComunicacao": "DD/MM/AAAA" | null,
-  "retorno": "Sim" | "Não",
-  "observacao": "string"
-}`;
+Exemplos de formato:
+Retomamos contato via hotline em 04/03. Sem retorno, mas 7 dias sem ocorrências após a ação.
+Abordagem direcionada aos e-mails mapeados. Sem novas ocorrências desde a última ação.
+O contato demonstrou receptividade e solicitou evidências. Material enviado, aguardando retorno.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
@@ -218,8 +218,8 @@ Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 512,
-        temperature: 0.1,
+        max_tokens: 120,
+        temperature: 0.2,
       }),
     });
 
@@ -229,21 +229,14 @@ Retorne SOMENTE um JSON válido, sem markdown, sem explicações:
     }
 
     const groqData = await groqRes.json();
-    const rawText: string = groqData.choices?.[0]?.message?.content ?? "";
+    let observacao: string = groqData.choices?.[0]?.message?.content?.trim() ?? "";
+    observacao = observacao.replace(/^["']|["']$/g, "");
+    if (observacao.length > 200) observacao = observacao.slice(0, 197) + "...";
 
-    let result: unknown;
-    try {
-      const clean = rawText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      result = JSON.parse(clean);
-    } catch {
-      return NextResponse.json({
-        success: false,
-        error: "A IA não retornou um JSON válido. Tente novamente.",
-        rawResponse: rawText,
-      });
-    }
-
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json({
+      success: true,
+      data: { nomeAgressor, etiquetaTopLeilao, notificacoesEnviadas, ultimaComunicacao, retorno, observacao },
+    });
   } catch (error) {
     console.error("resumo-tratativa error:", error);
     const msg = error instanceof Error ? error.message : "Erro desconhecido.";

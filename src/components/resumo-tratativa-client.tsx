@@ -6,7 +6,7 @@ import { FileSearch, Loader2, ClipboardCopy, Check, Eye, EyeOff, RotateCcw } fro
 
 interface ResumoResult {
   nomeAgressor: string;
-  etiquetaTopLeilao: "Ativada" | "Não ativada";
+  etiquetaTopLeilao: "Sim" | "Não";
   notificacoesEnviadas: number;
   ultimaComunicacao: string | null;
   retorno: "Sim" | "Não";
@@ -31,7 +31,6 @@ export function ResumoTratativaClient() {
   const [showToken, setShowToken] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResumoResult | null>(null);
-  const [termos, setTermos] = useState("");
   const [copied, setCopied] = useState(false);
 
   async function handleGenerate() {
@@ -41,7 +40,6 @@ export function ResumoTratativaClient() {
     }
     setLoading(true);
     setResult(null);
-    setTermos("");
     try {
       const res = await fetch("/api/resumo-tratativa", {
         method: "POST",
@@ -69,7 +67,7 @@ export function ResumoTratativaClient() {
   async function copyTable() {
     if (!result) return;
 
-    const leilao = result.etiquetaTopLeilao === "Ativada";
+    const leilao = result.etiquetaTopLeilao === "Sim";
     const resposta = result.retorno === "Sim";
     const notif = formatNotif(result.notificacoesEnviadas);
     const ultima = result.ultimaComunicacao ?? "—";
@@ -85,7 +83,7 @@ export function ResumoTratativaClient() {
   </tr></thead>
   <tbody><tr>
     ${td(result.nomeAgressor)}
-    ${td(termos || "—")}
+    ${td("-")}
     ${td(leilao ? "✓" : "✗", leilao ? "#16a34a" : "#dc2626")}
     ${td(notif)}
     ${td(ultima)}
@@ -96,7 +94,7 @@ export function ResumoTratativaClient() {
 
     const plain = [
       "Agressor\tTermos atingidos\tConcorrente (Leilão)\tNotificações Enviadas\tÚltima Notificação\tResposta\tObservação",
-      `${result.nomeAgressor}\t${termos || "—"}\t${leilao ? "✓" : "✗"}\t${notif}\t${ultima}\t${resposta ? "✓" : "✗"}\t${result.observacao}`,
+      `${result.nomeAgressor}\t-\t${leilao ? "✓" : "✗"}\t${notif}\t${ultima}\t${resposta ? "✓" : "✗"}\t${result.observacao}`,
     ].join("\n");
 
     try {
@@ -117,7 +115,6 @@ export function ResumoTratativaClient() {
   function reset() {
     setResult(null);
     setCardUrl("");
-    setTermos("");
   }
 
   return (
@@ -233,17 +230,9 @@ export function ResumoTratativaClient() {
                   <tbody>
                     <tr className="border-b border-slate-100">
                       <td className="px-4 py-5 text-center text-sm text-foreground">{result.nomeAgressor}</td>
+                      <td className="px-4 py-5 text-center text-foreground">-</td>
                       <td className="px-4 py-5 text-center">
-                        <input
-                          type="text"
-                          value={termos}
-                          onChange={(e) => setTermos(e.target.value)}
-                          placeholder="term1, term2"
-                          className="w-full min-w-[120px] text-sm text-center border border-border rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:border-[#2abfbf] bg-white"
-                        />
-                      </td>
-                      <td className="px-4 py-5 text-center">
-                        {result.etiquetaTopLeilao === "Ativada" ? <CheckIcon /> : <XIcon />}
+                        {result.etiquetaTopLeilao === "Sim" ? <CheckIcon /> : <XIcon />}
                       </td>
                       <td className="px-4 py-5 text-center font-semibold text-foreground">
                         {formatNotif(result.notificacoesEnviadas)}
