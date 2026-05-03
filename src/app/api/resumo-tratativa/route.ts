@@ -140,9 +140,13 @@ export async function POST(request: NextRequest) {
     }) ? "Sim" : "Não";
 
     // Notificações: conta quantas vezes o card foi para fase de quarentena no histórico
-    const notificacoesEnviadas: number = phasesHistory.filter((h) =>
+    const quarentenaPhases = phasesHistory.filter((h) =>
       h.phase?.name?.toLowerCase().includes("quarentena")
-    ).length;
+    );
+    const notificacoesEnviadas: number = quarentenaPhases.length;
+
+    // Debug: nomes de todas as fases retornadas pelo Pipefy
+    const _debugPhases = phasesHistory.map((h) => h.phase?.name ?? "?");
 
     const sortedComments = [...(card.comments ?? [])].sort(
       (a: { created_at: string }, b: { created_at: string }) =>
@@ -190,8 +194,9 @@ REGRAS:
 - ${retorno === "Sim" ? "Mencione que recebemos retorno do agressor" : "Mencione que não houve retorno"}
 - ${reincidente ? "Mencione que o agressor é reincidente" : "NÃO mencione reincidência"}
 - JAMAIS mencione endereços de e-mail, nomes de pessoas ou domínios completos
+- JAMAIS mencione que existe um cliente, empresa cliente ou relação com cliente — escreva como se a Branddi estivesse tratando diretamente
 - JAMAIS invente datas ou ações que não apareçam nos comentários
-- JAMAIS mencione o que foi discutido em detalhes (produto, marca, termo)
+- JAMAIS mencione o que foi discutido em detalhes (produto, marca, termo específico)
 - JAMAIS escreva "quarentena"
 - Uma frase ou duas, sem aspas, sem JSON
 
@@ -229,6 +234,7 @@ Realizada 3ª tentativa de comunicação. Agressor reincidente; recebemos retorn
     return NextResponse.json({
       success: true,
       data: { nomeAgressor, etiquetaTopLeilao, notificacoesEnviadas, ultimaComunicacao, retorno, observacao },
+      _debug: { phases: _debugPhases, quarentenaCount: quarentenaPhases.length },
     });
   } catch (error) {
     console.error("resumo-tratativa error:", error);
