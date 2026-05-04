@@ -154,8 +154,13 @@ export async function POST(request: NextRequest) {
         .map((h) => h.phase?.name ?? "")
     ).size;
 
-    // Debug: nomes de todas as fases retornadas pelo Pipefy
+    // Debug: nomes de fases e campos do card
     const _debugPhases = phasesHistory.map((h) => h.phase?.name ?? "?");
+    const _debugFields = (card.fields ?? []).map((f: { field: { label: string }; value: string; date_value: string }) => ({
+      label: f.field?.label,
+      value: f.value,
+      date_value: f.date_value,
+    }));
 
     const sortedComments = [...(card.comments ?? [])].sort(
       (a: { created_at: string }, b: { created_at: string }) =>
@@ -249,7 +254,7 @@ Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um n
     return NextResponse.json({
       success: true,
       data: { nomeAgressor, etiquetaTopLeilao, notificacoesEnviadas, ultimaComunicacao, retorno, observacao },
-      _debug: { phases: _debugPhases, notificacoesCount: notificacoesEnviadas },
+      _debug: { phases: _debugPhases, notificacoesCount: notificacoesEnviadas, fields: _debugFields },
     });
   } catch (error) {
     console.error("resumo-tratativa error:", error);
