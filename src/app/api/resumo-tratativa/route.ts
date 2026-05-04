@@ -139,16 +139,11 @@ export async function POST(request: NextRequest) {
       return hasTopLeilao && !isOff;
     }) ? "Sim" : "Não";
 
-    // Notificações: conta fases de outreach (tentativa, hotline, prioridade)
-    // Exclui fases de espera (quarentena) e internas (aprovação, ocorrências, sucesso)
-    const notificacoesEnviadas: number = phasesHistory.filter((h) => {
-      const name = h.phase?.name?.toLowerCase() ?? "";
-      const isOutreach =
-        (name.includes("tentativa") && !name.includes("quarentena")) ||
-        name.includes("hotline") ||
-        name.includes("prioridade");
-      return isOutreach;
-    }).length;
+    // Notificações: cada fase de quarentena = uma notificação confirmada como enviada
+    // (card vai pra quarentena DEPOIS de enviar a notificação, independente do canal)
+    const notificacoesEnviadas: number = phasesHistory.filter((h) =>
+      h.phase?.name?.toLowerCase().includes("quarentena")
+    ).length;
 
     // Debug: nomes de todas as fases retornadas pelo Pipefy
     const _debugPhases = phasesHistory.map((h) => h.phase?.name ?? "?");
@@ -173,6 +168,18 @@ export async function POST(request: NextRequest) {
       h.phase?.name?.toLowerCase().includes("sucesso")
     );
 
+    // Campo "Data da última vez que apareceu no relatório" (ou similar)
+    const cardFields: { field: { label: string }; value: string; date_value: string }[] = card.fields ?? [];
+    const ultimaOcorrenciaField = cardFields.find((f) =>
+      /[úu]ltim|ocorr[êe]ncia|apareceu|relat[óo]rio/i.test(f.field?.label ?? "")
+    );
+    const ultimaOcorrencia: string | null =
+      ultimaOcorrenciaField?.date_value
+        ? formatDate(ultimaOcorrenciaField.date_value)
+        : ultimaOcorrenciaField?.value
+        ? ultimaOcorrenciaField.value
+        : null;
+
     const recentComments = sortedComments
       .slice(0, 6)
       .map(
@@ -190,27 +197,28 @@ CONTEXTO DO CARD:
 - Agressor: ${nomeAgressor}
 - Reincidente: ${reincidente ? "SIM" : "NÃO"}
 - Retorno do agressor: ${retorno === "Sim" ? "SIM — o agressor respondeu" : "NÃO — o agressor não respondeu"}
-- Comentários recentes (use para extrair datas, canal e ações realizadas):
+- Última ocorrência registrada: ${ultimaOcorrencia ?? "não informada"}
+- Comentários recentes (BASE PRINCIPAL — extraia datas, canal e o que aconteceu):
 ${recentComments || "Nenhum comentário"}
 
 REGRAS:
 - Máximo 200 caracteres
-- Mencione a data da ação mais recente (ex: "em 20/04/2026"), o canal (e-mail, hotline, LinkedIn) e o status
-- ${retorno === "Sim" ? "Mencione que recebemos retorno do agressor" : "Mencione que não houve retorno"}
+- Foque no que está nos comentários mais recentes: qual ação foi feita, canal usado, data
+- ${retorno === "Sim" ? "INCLUA o que o agressor respondeu (baseado nos comentários)" : "Mencione que não houve retorno"}
+- ${ultimaOcorrencia ? `Mencione a última ocorrência registrada (${ultimaOcorrencia}) se relevante` : ""}
 - ${reincidente ? "Mencione que o agressor é reincidente" : "NÃO mencione reincidência"}
 - JAMAIS mencione endereços de e-mail, nomes de pessoas ou domínios completos
-- JAMAIS mencione que existe um cliente, empresa cliente ou relação com cliente — escreva como se a Branddi estivesse tratando diretamente
+- JAMAIS mencione que existe um cliente ou empresa cliente
 - JAMAIS invente datas ou ações que não apareçam nos comentários
-- JAMAIS mencione o que foi discutido em detalhes (produto, marca, termo específico)
+- JAMAIS mencione termos ou produtos específicos discutidos
 - JAMAIS escreva "quarentena" ou "ciclo"
 - Uma frase ou duas, sem aspas, sem JSON
 
-EXEMPLOS (siga este estilo exato):
-Em 26/01, foi enviado e-mail à equipe responsável solicitando negativação, com envio de evidências. Aguardamos retorno.
-Nova tentativa de contato enviada em 20/04/2026. Sem retorno, mantendo atenção no caso e monitorando as ocorrências.
-Efetuada nova tentativa com hotline em 17/04/2026. Nosso time realiza regarimpo para nova tentativa.
-Foi realizada a primeira tentativa de contato via e-mail ao contato garimpado. Ainda não tivemos retorno.
-Realizada 3ª tentativa de comunicação. Agressor reincidente; recebemos retorno e nosso time se prepara para próxima ação.`;
+EXEMPLOS (siga este estilo):
+Em 26/01, foi enviado e-mail solicitando negativação, com evidências. Aguardamos retorno.
+Nova tentativa enviada em 20/04/2026. Sem retorno; última ocorrência registrada em 18/04/2026.
+Efetuada tentativa via hotline em 17/04/2026. Nosso time realiza regarimpo para nova tentativa.
+Agressor reincidente. Recebemos retorno solicitando evidências; material enviado em 23/01/2026.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
