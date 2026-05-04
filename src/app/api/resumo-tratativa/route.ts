@@ -139,12 +139,15 @@ export async function POST(request: NextRequest) {
       return hasTopLeilao && !isOff;
     }) ? "Sim" : "Não";
 
-    // Notificações: conta fases de "Tentativa" (excluindo "Quarentena")
-    // Ex: "N1. 1a Tentativa", "N2. 1a Tentativa" = 1 notificação cada
-    // "N1. Quarentena - 1a Tentativa" = período de espera, não conta
+    // Notificações: conta fases de outreach (tentativa, hotline, prioridade)
+    // Exclui fases de espera (quarentena) e internas (aprovação, ocorrências, sucesso)
     const notificacoesEnviadas: number = phasesHistory.filter((h) => {
       const name = h.phase?.name?.toLowerCase() ?? "";
-      return name.includes("tentativa") && !name.includes("quarentena");
+      const isOutreach =
+        (name.includes("tentativa") && !name.includes("quarentena")) ||
+        name.includes("hotline") ||
+        name.includes("prioridade");
+      return isOutreach;
     }).length;
 
     // Debug: nomes de todas as fases retornadas pelo Pipefy
@@ -199,7 +202,7 @@ REGRAS:
 - JAMAIS mencione que existe um cliente, empresa cliente ou relação com cliente — escreva como se a Branddi estivesse tratando diretamente
 - JAMAIS invente datas ou ações que não apareçam nos comentários
 - JAMAIS mencione o que foi discutido em detalhes (produto, marca, termo específico)
-- JAMAIS escreva "quarentena"
+- JAMAIS escreva "quarentena" ou "ciclo"
 - Uma frase ou duas, sem aspas, sem JSON
 
 EXEMPLOS (siga este estilo exato):
@@ -207,7 +210,7 @@ Em 26/01, foi enviado e-mail à equipe responsável solicitando negativação, c
 Nova tentativa de contato enviada em 20/04/2026. Sem retorno, mantendo atenção no caso e monitorando as ocorrências.
 Efetuada nova tentativa com hotline em 17/04/2026. Nosso time realiza regarimpo para nova tentativa.
 Foi realizada a primeira tentativa de contato via e-mail ao contato garimpado. Ainda não tivemos retorno.
-Realizada 3ª tentativa de comunicação. Agressor reincidente; recebemos retorno e nosso time se prepara para próximo ciclo.`;
+Realizada 3ª tentativa de comunicação. Agressor reincidente; recebemos retorno e nosso time se prepara para próxima ação.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
