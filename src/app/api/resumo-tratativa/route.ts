@@ -190,38 +190,36 @@ export async function POST(request: NextRequest) {
 
     // ── Groq: apenas para a observação ───────────────────────────────────────
 
-    const prompt = `Você é um analista escrevendo o campo "observacao" de um resumo de tratativa.
-Use voz passiva/impessoal — como nos exemplos abaixo. NUNCA use "Nós, do Branddi Monitor" ou similares.
+    const prompt = `Você é um especialista em comunicação de proteção de marca, responsável por redigir atualizações de tratativas.
+Narre de forma humanizada e profissional o status do caso — como se estivesse contando uma história de acompanhamento próximo e comprometido.
 
-CONTEXTO:
+DADOS DO CASO:
 - Reincidente: ${reincidente ? "SIM" : "NÃO"}
 - Retorno do agressor: ${retorno === "Sim" ? "SIM — respondeu" : "NÃO — não respondeu"}
 - Última ocorrência registrada: ${ultimaOcorrencia ?? "não informada"}
-- Comentários (extraia: data, canal, o que foi feito):
+- Comentários recentes (base principal — extraia: data, canal, ações, resultado):
 ${recentComments || "Nenhum comentário"}
 
-PROIBIÇÕES ABSOLUTAS:
-- NUNCA diga "Nós, do Branddi Monitor", "Branddi Monitor" ou qualquer nome de empresa
-- NUNCA mencione o domínio ou nome do agressor
-- NUNCA mencione nomes de marcas, produtos ou empresas citados nos comentários
-- NUNCA mencione e-mails, nomes de pessoas ou cargos
-- NUNCA mencione cliente, empresa cliente ou relação de cliente
-- NUNCA invente dados que não estejam nos comentários acima
-- NUNCA escreva "quarentena" ou "ciclo"
+━━ O QUE DEVE APARECER ━━
+• A tentativa de contato mais recente: quando foi e por qual canal (e-mail, WhatsApp, LinkedIn, hotline)
+• ${retorno === "Sim" ? "Houve retorno: descreva brevemente o que foi indicado e o encaminhamento" : "Não houve retorno: mencione que aguardamos posicionamento"}
+• ${ultimaOcorrencia ? `Informe: "última ocorrência registrada em ${ultimaOcorrencia}"` : ""}
+• ${reincidente ? "Mencione que o agressor é reincidente e que o caso é tratado com atenção prioritária" : ""}
+• Finalize com o status atual: aguardando retorno / monitorando / em regarimpo para nova tentativa
 
-REGRAS:
-- Máximo 200 caracteres
-- ${reincidente ? "Mencione que é reincidente" : "NÃO mencione reincidência"}
-- ${retorno === "Sim" ? "Inclua que houve retorno e o teor geral (sem citar marcas/produtos)" : "Mencione ausência de retorno"}
-- ${ultimaOcorrencia ? `Inclua "última ocorrência em ${ultimaOcorrencia}"` : ""}
-- Uma ou duas frases, sem aspas, sem JSON
+━━ O QUE NUNCA PODE APARECER ━━
+• "NE", "notificação extrajudicial", "ação jurídica", "advogado" ou qualquer termo legal
+• Nomes de clientes, marcas de terceiros, produtos ou empresas citadas nos comentários
+• "ciclo 1", "ciclo 2", "última tentativa" ou qualquer numeração de ciclo interno
+• Domínios, endereços de e-mail ou nomes de pessoas
+• Nomes de empresa como "Branddi Monitor" ou similar
+• Linguagem fria: "conforme protocolo", "procedimento padrão", "SLA"
 
-EXEMPLOS OBRIGATÓRIOS (imite este estilo):
-Em 26/01, foi enviado e-mail solicitando negativação, com evidências. Aguardamos retorno.
-Nova tentativa enviada em 20/04/2026. Sem retorno; última ocorrência registrada em 18/04/2026.
-Efetuada tentativa via hotline em 17/04/2026. Regarimpo em andamento para nova tentativa.
-Agressor reincidente. Retorno recebido solicitando evidências; material enviado em 23/01/2026.
-Foi realizada a primeira tentativa de contato via e-mail ao contato garimpado. Sem retorno até o momento.`;
+━━ TOM E ESTILO ━━
+• Humanizado, direto e profissional
+• Primeira pessoa do plural ("nosso time", "enviamos", "retomamos") OU relato de ação ("foi realizada", "efetuamos")
+• Máximo 200 caracteres — frases curtas, sem repetição
+• Sem aspas, sem JSON, sem explicações extras`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
