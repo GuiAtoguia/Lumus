@@ -199,37 +199,28 @@ export async function POST(request: NextRequest) {
 
     // ── Groq: apenas para a observação ───────────────────────────────────────
 
-    const prompt = `Você é um especialista em comunicação de proteção de marca, responsável por redigir atualizações de tratativas.
-Narre de forma humanizada e profissional o status do caso — como se estivesse contando uma história de acompanhamento próximo e comprometido.
+    const prompt = `Você é um especialista em comunicação de proteção de marca. Escreva o campo "observacao" de uma tratativa.
 
-DADOS DO CASO:
+DADOS:
 - Reincidente: ${reincidente ? "SIM" : "NÃO"}
 - Retorno do agressor: ${retorno === "Sim" ? "SIM — respondeu" : "NÃO — não respondeu"}
 - Última ocorrência registrada: ${ultimaOcorrencia ?? "não informada"}
-- Comentários recentes (base principal — extraia: data, canal, ações, resultado):
+- Comentários (extraia data, canal e o que aconteceu):
 ${recentComments || "Nenhum comentário"}
 
-━━ O QUE DEVE APARECER ━━
-• A tentativa de contato mais recente: quando foi e por qual canal (e-mail, WhatsApp, LinkedIn, hotline)
-• ${retorno === "Sim" ? "Houve retorno: descreva brevemente o que foi indicado e o encaminhamento" : "Não houve retorno: mencione que aguardamos posicionamento"}
-• ${ultimaOcorrencia ? `Informe: "última ocorrência registrada em ${ultimaOcorrencia}"` : ""}
-• ${reincidente ? "Mencione que o agressor é reincidente e que o caso é tratado com atenção prioritária" : ""}
-• Finalize com o status atual: aguardando retorno / monitorando / em regarimpo para nova tentativa
+ESTRUTURA OBRIGATÓRIA:
+1. Comece com a ação/evento mais recente + data (extraia dos comentários)
+2. ${retorno === "Sim" ? "Descreva brevemente o que o agressor respondeu/alegou" : "Informe que aguarda-se posicionamento ou que não houve retorno"}
+3. ${reincidente ? "Mencione que é reincidente" : ""}
+4. ${ultimaOcorrencia ? `Finalize SEMPRE com: "A última ocorrência registrada foi no dia ${ultimaOcorrencia}."` : "Finalize com o status atual (aguardando retorno / monitorando)"}
 
-━━ O QUE NUNCA PODE APARECER ━━
-• "NE", "notificação extrajudicial", "ação jurídica", "advogado" ou qualquer termo legal
-• Nomes de clientes, marcas de terceiros, produtos ou empresas citadas nos comentários
-• "ciclo 1", "ciclo 2", "última tentativa" ou qualquer numeração de ciclo interno
-• Domínios, endereços de e-mail ou nomes de pessoas
-• Nomes de empresa como "Branddi Monitor" ou similar
-• Linguagem fria: "conforme protocolo", "procedimento padrão", "SLA"
+NUNCA mencione: e-mails, nomes de pessoas, domínios, marcas/produtos, "Branddi Monitor", "ciclo", "quarentena", termos jurídicos, Markdown ou asteriscos.
+Texto simples, sem título, sem aspas. Máximo 250 caracteres.
 
-━━ TOM E ESTILO ━━
-• Humanizado, direto e profissional
-• Primeira pessoa do plural ("nosso time", "enviamos", "retomamos") OU relato de ação ("foi realizada", "efetuamos")
-• COMECE diretamente com a ação ou data — sem introdução, sem título, sem "Atualização:"
-• Máximo 200 caracteres — frases curtas, sem repetição
-• APENAS texto simples: sem asteriscos, sem negrito, sem Markdown, sem JSON, sem aspas`;
+EXEMPLOS REAIS (siga este estilo exato):
+No ultimo contato realizado em 29/04, tivemos um retorno do agressor alegando que não identificaram ocorrências nos testes realizados. Aguarda-se posicionamento e a última ocorrência registrada foi no dia 01/05/2026.
+No dia 22/04/2026 recebemos a confirmação da negativação. A última ocorrência registrada foi no dia 16/04/2026.
+Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um novo retorno. A última ocorrência registrada foi no dia 02/05/2026.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
@@ -240,7 +231,7 @@ ${recentComments || "Nenhum comentário"}
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 120,
+        max_tokens: 160,
         temperature: 0.2,
       }),
     });
@@ -253,7 +244,7 @@ ${recentComments || "Nenhum comentário"}
     const groqData = await groqRes.json();
     let observacao: string = groqData.choices?.[0]?.message?.content?.trim() ?? "";
     observacao = observacao.replace(/^["']|["']$/g, "");
-    if (observacao.length > 200) observacao = observacao.slice(0, 197) + "...";
+    if (observacao.length > 250) observacao = observacao.slice(0, 247) + "...";
 
     return NextResponse.json({
       success: true,

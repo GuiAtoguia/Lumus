@@ -245,8 +245,8 @@ export function ResumoTratativaClient() {
                       </td>
                       <td className="px-4 py-5 text-center text-foreground leading-relaxed max-w-xs">
                         <p>{result.observacao}</p>
-                        <span className={`text-[10px] mt-1 block ${result.observacao.length > 200 ? "text-red-500" : "text-muted-foreground"}`}>
-                          {result.observacao.length}/200
+                        <span className={`text-[10px] mt-1 block ${result.observacao.length > 250 ? "text-red-500" : "text-muted-foreground"}`}>
+                          {result.observacao.length}/250
                         </span>
                       </td>
                     </tr>
