@@ -190,35 +190,38 @@ export async function POST(request: NextRequest) {
 
     // ── Groq: apenas para a observação ───────────────────────────────────────
 
-    const prompt = `Você é um analista da Branddi Monitor escrevendo o campo "observacao".
-Conte uma breve narrativa da tratativa em primeira pessoa do plural (nós = time Branddi Monitor).
+    const prompt = `Você é um analista escrevendo o campo "observacao" de um resumo de tratativa.
+Use voz passiva/impessoal — como nos exemplos abaixo. NUNCA use "Nós, do Branddi Monitor" ou similares.
 
-CONTEXTO DO CARD:
-- Agressor: ${nomeAgressor}
+CONTEXTO:
 - Reincidente: ${reincidente ? "SIM" : "NÃO"}
-- Retorno do agressor: ${retorno === "Sim" ? "SIM — o agressor respondeu" : "NÃO — o agressor não respondeu"}
+- Retorno do agressor: ${retorno === "Sim" ? "SIM — respondeu" : "NÃO — não respondeu"}
 - Última ocorrência registrada: ${ultimaOcorrencia ?? "não informada"}
-- Comentários recentes (BASE PRINCIPAL — extraia datas, canal e o que aconteceu):
+- Comentários (extraia: data, canal, o que foi feito):
 ${recentComments || "Nenhum comentário"}
+
+PROIBIÇÕES ABSOLUTAS:
+- NUNCA diga "Nós, do Branddi Monitor", "Branddi Monitor" ou qualquer nome de empresa
+- NUNCA mencione o domínio ou nome do agressor
+- NUNCA mencione nomes de marcas, produtos ou empresas citados nos comentários
+- NUNCA mencione e-mails, nomes de pessoas ou cargos
+- NUNCA mencione cliente, empresa cliente ou relação de cliente
+- NUNCA invente dados que não estejam nos comentários acima
+- NUNCA escreva "quarentena" ou "ciclo"
 
 REGRAS:
 - Máximo 200 caracteres
-- Foque no que está nos comentários mais recentes: qual ação foi feita, canal usado, data
-- ${retorno === "Sim" ? "INCLUA o que o agressor respondeu (baseado nos comentários)" : "Mencione que não houve retorno"}
-- ${ultimaOcorrencia ? `Mencione a última ocorrência registrada (${ultimaOcorrencia}) se relevante` : ""}
-- ${reincidente ? "Mencione que o agressor é reincidente" : "NÃO mencione reincidência"}
-- JAMAIS mencione endereços de e-mail, nomes de pessoas ou domínios completos
-- JAMAIS mencione que existe um cliente ou empresa cliente
-- JAMAIS invente datas ou ações que não apareçam nos comentários
-- JAMAIS mencione termos ou produtos específicos discutidos
-- JAMAIS escreva "quarentena" ou "ciclo"
-- Uma frase ou duas, sem aspas, sem JSON
+- ${reincidente ? "Mencione que é reincidente" : "NÃO mencione reincidência"}
+- ${retorno === "Sim" ? "Inclua que houve retorno e o teor geral (sem citar marcas/produtos)" : "Mencione ausência de retorno"}
+- ${ultimaOcorrencia ? `Inclua "última ocorrência em ${ultimaOcorrencia}"` : ""}
+- Uma ou duas frases, sem aspas, sem JSON
 
-EXEMPLOS (siga este estilo):
+EXEMPLOS OBRIGATÓRIOS (imite este estilo):
 Em 26/01, foi enviado e-mail solicitando negativação, com evidências. Aguardamos retorno.
 Nova tentativa enviada em 20/04/2026. Sem retorno; última ocorrência registrada em 18/04/2026.
-Efetuada tentativa via hotline em 17/04/2026. Nosso time realiza regarimpo para nova tentativa.
-Agressor reincidente. Recebemos retorno solicitando evidências; material enviado em 23/01/2026.`;
+Efetuada tentativa via hotline em 17/04/2026. Regarimpo em andamento para nova tentativa.
+Agressor reincidente. Retorno recebido solicitando evidências; material enviado em 23/01/2026.
+Foi realizada a primeira tentativa de contato via e-mail ao contato garimpado. Sem retorno até o momento.`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
