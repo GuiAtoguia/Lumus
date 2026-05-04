@@ -139,11 +139,20 @@ export async function POST(request: NextRequest) {
       return hasTopLeilao && !isOff;
     }) ? "Sim" : "Não";
 
-    // Notificações: cada fase de quarentena = uma notificação confirmada como enviada
-    // (card vai pra quarentena DEPOIS de enviar a notificação, independente do canal)
-    const notificacoesEnviadas: number = phasesHistory.filter((h) =>
-      h.phase?.name?.toLowerCase().includes("quarentena")
-    ).length;
+    // Notificações: conta fases de outreach distintas (deduplicado por nome de fase)
+    // "N1. 1a Tentativa", "N1. 2a Tentativa", "N2. Hotline" = 3 notificações
+    // "N2. Hotline" visitado 2x ainda conta como 1 (mesma fase, ida e volta)
+    const notificacoesEnviadas: number = new Set(
+      phasesHistory
+        .filter((h) => {
+          const name = h.phase?.name?.toLowerCase() ?? "";
+          return (
+            (name.includes("tentativa") || name.includes("hotline") || name.includes("prioridade")) &&
+            !name.includes("quarentena")
+          );
+        })
+        .map((h) => h.phase?.name ?? "")
+    ).size;
 
     // Debug: nomes de todas as fases retornadas pelo Pipefy
     const _debugPhases = phasesHistory.map((h) => h.phase?.name ?? "?");
@@ -218,8 +227,9 @@ ${recentComments || "Nenhum comentário"}
 ━━ TOM E ESTILO ━━
 • Humanizado, direto e profissional
 • Primeira pessoa do plural ("nosso time", "enviamos", "retomamos") OU relato de ação ("foi realizada", "efetuamos")
+• COMECE diretamente com a ação ou data — sem introdução, sem título, sem "Atualização:"
 • Máximo 200 caracteres — frases curtas, sem repetição
-• Sem aspas, sem JSON, sem explicações extras`;
+• APENAS texto simples: sem asteriscos, sem negrito, sem Markdown, sem JSON, sem aspas`;
 
     const groqRes = await fetch(GROQ_API, {
       method: "POST",
