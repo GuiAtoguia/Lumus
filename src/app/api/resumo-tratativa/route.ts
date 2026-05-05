@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const PIPEFY_GRAPHQL = "https://api.pipefy.com/graphql";
-const GROQ_API = "https://api.groq.com/openai/v1/chat/completions";
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 const CARD_QUERY = `
   query GetCard($id: ID!) {
@@ -120,9 +121,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const groqKey = process.env.GROQ_API_KEY || "";
-    if (!groqKey) {
-      return NextResponse.json({ error: "GROQ_API_KEY não configurada." }, { status: 500 });
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: "GEMINI_API_KEY não configurada." }, { status: 500 });
     }
 
     // ── Campos determinísticos (código puro, sem IA) ──────────────────────────
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       )
       .join("\n");
 
-    // ── Groq: apenas para a observação ───────────────────────────────────────
+    // ── Gemini: apenas para a observação ─────────────────────────────────────
 
     const prompt = `Você é um especialista em comunicação de proteção de marca. Escreva o campo "observacao" de uma tratativa.
 
@@ -227,27 +227,13 @@ No ultimo contato realizado em 29/04, tivemos um retorno do agressor alegando qu
 No dia 22/04/2026 recebemos a confirmação da negativação. A última ocorrência registrada foi no dia 16/04/2026.
 Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um novo retorno. A última ocorrência registrada foi no dia 02/05/2026.`;
 
-    const groqRes = await fetch(GROQ_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${groqKey}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 160,
-        temperature: 0.2,
-      }),
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: { temperature: 0.2, maxOutputTokens: 160 },
     });
 
-    if (!groqRes.ok) {
-      const err = await groqRes.text();
-      throw new Error(`Groq API: ${groqRes.status} — ${err}`);
-    }
-
-    const groqData = await groqRes.json();
-    let observacao: string = groqData.choices?.[0]?.message?.content?.trim() ?? "";
+    const result = await model.generateContent(prompt);
+    let observacao: string = result.response.text().trim();
     observacao = observacao.replace(/^["']|["']$/g, "");
     if (observacao.length > 250) observacao = observacao.slice(0, 247) + "...";
 
