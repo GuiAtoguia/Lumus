@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://raw.githubusercontent.com/jessicanaves-debug/v500/main/src/components/apresentacao-client.tsx\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/jessicanaves-debug/v500/main/src/app/api/analyze-chart/route.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/jessicanaves-debug/v500/main/src/app/api/test-gemini/logo-proxy/route.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/jessicanaves-debug/v500/main/src/components/app-shell.tsx\")",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ]
+  }
+}
