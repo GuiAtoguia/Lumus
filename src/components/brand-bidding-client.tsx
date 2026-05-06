@@ -215,20 +215,23 @@ export function BrandBiddingClient() {
         )
       );
       const imported: ContentionAction[] = [];
-      let errors = 0;
+      const errorMessages: string[] = [];
       for (const json of results) {
         if (json.success) {
           imported.push({ domain: json.data.nomeAgressor, status: json.data.observacao });
         } else {
-          errors++;
+          errorMessages.push(json.error || "Erro desconhecido");
         }
       }
       if (imported.length > 0) {
         setContentionActions(imported);
         toast.success(`${imported.length} agressor${imported.length > 1 ? "es" : ""} importado${imported.length > 1 ? "s" : ""}!`);
       }
-      if (errors > 0) {
-        toast.error(`${errors} card${errors > 1 ? "s" : ""} com erro — verifique a URL ou o token.`);
+      if (errorMessages.length > 0) {
+        toast.error(errorMessages[0], { duration: 8000, style: { maxWidth: "480px" } });
+        if (errorMessages.length > 1) {
+          toast.error(`+ ${errorMessages.length - 1} outro${errorMessages.length > 2 ? "s" : ""} erro${errorMessages.length > 2 ? "s" : ""}`, { duration: 8000 });
+        }
       }
     } catch {
       toast.error("Erro de conexão ao importar cards.");

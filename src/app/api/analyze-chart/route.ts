@@ -88,6 +88,12 @@ export async function POST(request: NextRequest) {
           { status: 429 }
         );
       }
+      if (apiMsg.includes("503") || apiMsg.includes("Service Unavailable") || apiMsg.includes("overloaded") || apiMsg.includes("high demand")) {
+        return NextResponse.json(
+          { success: false, error: "O Gemini está sobrecarregado agora (503). Aguarde alguns segundos e clique em Gerar novamente." },
+          { status: 503 }
+        );
+      }
       if (apiMsg.includes("not found") || apiMsg.includes("NOT_FOUND")) {
         return NextResponse.json(
           { success: false, error: `Modelo ${MODEL_ID} não disponível pra essa chave. Tente gerar uma nova chave em aistudio.google.com/apikey.` },
