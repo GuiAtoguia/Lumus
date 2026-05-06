@@ -229,7 +229,7 @@ Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um n
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.2, maxOutputTokens: 160 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 350 },
     });
 
     const result = await model.generateContent(prompt);

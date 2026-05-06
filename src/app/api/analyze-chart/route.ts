@@ -7,7 +7,7 @@ import {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-type ChartType = "agressores" | "heatmap";
+type ChartType = "agressores" | "heatmap" | "metricas";
 
 const MODEL_ID = "gemini-2.5-flash";
 
@@ -24,45 +24,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
-    const file = formData.get("image") as File | null;
-    const chartType = (formData.get("chartType") as string) as ChartType;
-
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: "Imagem não fornecida." },
-        { status: 400 }
-      );
-    }
-    if (chartType !== "agressores" && chartType !== "heatmap") {
-      return NextResponse.json(
-        { success: false, error: "Tipo de gráfico inválido." },
-        { status: 400 }
-      );
-    }
-
-    const buffer = await file.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
-    const rawType = file.type || "image/png";
-    const mimeType = ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(rawType)
-      ? rawType
-      : "image/png";
+    const contentType = request.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
 
     const model = genAI.getGenerativeModel({
       model: MODEL_ID,
       systemInstruction: ANALYST_SYSTEM_PROMPT,
-      generationConfig: {
-        temperature: 0.7,
-        responseMimeType: "application/json",
-      },
+      generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
     });
 
     let result;
     try {
-      result = await model.generateContent([
-        { inlineData: { mimeType, data: base64 } },
-        { text: buildUserPrompt(chartType) },
-      ]);
+      if (isJson) {
+        // Chamada sem imagem (ex: análise dos Big Numbers com texto)
+        const body = await request.json() as { textPrompt?: string; chartType?: string };
+        if (!body.textPrompt) {
+          return NextResponse.json({ success: false, error: "textPrompt não fornecido." }, { status: 400 });
+        }
+        result = await model.generateContent(body.textPrompt);
+      } else {
+        // Chamada com imagem (FormData)
+        const formData = await request.formData();
+        const file = formData.get("image") as File | null;
+        const chartType = (formData.get("chartType") as string) as ChartType;
+
+        if (!file) {
+          return NextResponse.json({ success: false, error: "Imagem não fornecida." }, { status: 400 });
+        }
+        if (chartType !== "agressores" && chartType !== "heatmap") {
+          return NextResponse.json({ success: false, error: "Tipo de gráfico inválido." }, { status: 400 });
+        }
+
+        const buffer = await file.arrayBuffer();
+        const base64 = Buffer.from(buffer).toString("base64");
+        const rawType = file.type || "image/png";
+        const mimeType = ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(rawType)
+          ? rawType
+          : "image/png";
+
+        result = await model.generateContent([
+          { inlineData: { mimeType, data: base64 } },
+          { text: buildUserPrompt(chartType as "agressores" | "heatmap") },
+        ]);
+      }
     } catch (apiError) {
       const apiMsg = apiError instanceof Error ? apiError.message : String(apiError);
 
