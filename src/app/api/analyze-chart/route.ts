@@ -17,12 +17,12 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
       return await fn();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const transient =
-        msg.includes("503") || msg.includes("Service Unavailable") ||
-        msg.includes("overloaded") || msg.includes("high demand") ||
-        msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED");
-      if (transient && attempt < maxRetries - 1) {
-        await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
+      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Too Many Requests");
+      const is503 = msg.includes("503") || msg.includes("Service Unavailable") || msg.includes("overloaded") || msg.includes("high demand");
+      if ((is429 || is503) && attempt < maxRetries - 1) {
+        // 429 needs longer wait; 503 is transient
+        const delay = is429 ? (attempt + 1) * 15000 : (attempt + 1) * 3000;
+        await new Promise((r) => setTimeout(r, delay));
         continue;
       }
       throw err;
