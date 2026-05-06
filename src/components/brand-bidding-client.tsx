@@ -205,15 +205,19 @@ export function BrandBiddingClient() {
     }
     setLoadingImport(true);
     try {
-      const results = await Promise.all(
-        urls.map((url) =>
-          fetch("/api/resumo-tratativa", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ cardUrl: url, pipefyToken: pipefyToken.trim() || undefined }),
-          }).then((r) => r.json())
-        )
-      );
+      const results: { success: boolean; data?: { nomeAgressor: string; observacao: string }; error?: string }[] = [];
+      for (const url of urls) {
+        const json = await fetch("/api/resumo-tratativa", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cardUrl: url, pipefyToken: pipefyToken.trim() || undefined }),
+        }).then((r) => r.json());
+        results.push(json);
+        // Small delay between cards to avoid hitting Gemini rate limits
+        if (urls.indexOf(url) < urls.length - 1) {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
       const imported: ContentionAction[] = [];
       const errorMessages: string[] = [];
       for (const json of results) {

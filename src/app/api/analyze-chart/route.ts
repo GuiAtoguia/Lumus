@@ -9,7 +9,27 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 type ChartType = "agressores" | "heatmap" | "metricas";
 
-const MODEL_ID = "gemini-2.5-flash";
+const MODEL_ID = "gemini-2.0-flash";
+
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const transient =
+        msg.includes("503") || msg.includes("Service Unavailable") ||
+        msg.includes("overloaded") || msg.includes("high demand") ||
+        msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED");
+      if (transient && attempt < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +61,7 @@ export async function POST(request: NextRequest) {
         if (!body.textPrompt) {
           return NextResponse.json({ success: false, error: "textPrompt não fornecido." }, { status: 400 });
         }
-        result = await model.generateContent(body.textPrompt);
+        result = await withRetry(() => model.generateContent(body.textPrompt!));
       } else {
         // Chamada com imagem (FormData)
         const formData = await request.formData();
@@ -62,10 +82,10 @@ export async function POST(request: NextRequest) {
           ? rawType
           : "image/png";
 
-        result = await model.generateContent([
+        result = await withRetry(() => model.generateContent([
           { inlineData: { mimeType, data: base64 } },
           { text: buildUserPrompt(chartType as "agressores" | "heatmap") },
-        ]);
+        ]));
       }
     } catch (apiError) {
       const apiMsg = apiError instanceof Error ? apiError.message : String(apiError);

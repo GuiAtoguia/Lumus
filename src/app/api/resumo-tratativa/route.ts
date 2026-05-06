@@ -4,6 +4,26 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const PIPEFY_GRAPHQL = "https://api.pipefy.com/graphql";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const transient =
+        msg.includes("503") || msg.includes("Service Unavailable") ||
+        msg.includes("overloaded") || msg.includes("high demand") ||
+        msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED");
+      if (transient && attempt < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, (attempt + 1) * 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 const CARD_QUERY = `
   query GetCard($id: ID!) {
     card(id: $id) {
@@ -228,11 +248,11 @@ No dia 22/04/2026 recebemos a confirmação da negativação. A última ocorrên
 Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um novo retorno. A última ocorrência registrada foi no dia 02/05/2026.`;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
     });
 
-    const result = await model.generateContent(prompt);
+    const result = await withRetry(() => model.generateContent(prompt));
     let observacao: string = result.response.text().trim();
     observacao = observacao.replace(/^["']|["']$/g, "");
 
