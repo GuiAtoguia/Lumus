@@ -14,7 +14,10 @@ import {
   Trash2,
   Shield,
   Eye,
+  EyeOff,
   FileDown,
+  Link,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateBbPdf } from "@/lib/generate-bb-pdf";
@@ -118,6 +121,12 @@ export function BrandBiddingClient() {
   const [reportType, setReportType] = useState<"Semanal" | "Quinzenal">("Quinzenal");
   const [periodDays, setPeriodDays] = useState("14");
   const [periodLabel, setPeriodLabel] = useState("");
+  const [pipefyToken, setPipefyToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
+
+  // Import Pipefy cards (seção 4)
+  const [cardUrls, setCardUrls] = useState<string[]>(["", "", ""]);
+  const [loadingImport, setLoadingImport] = useState(false);
 
   // Métricas
   const [metrics, setMetrics] = useState<Metrics>({
@@ -245,6 +254,50 @@ export function BrandBiddingClient() {
 
   function removeStandby(index: number) {
     setStandbyCases((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // ── Pipefy import ────────────────────────────────────────────────────────────
+
+  async function importFromPipefy() {
+    const urls = cardUrls.map((u) => u.trim()).filter(Boolean);
+    if (urls.length === 0) {
+      toast.error("Cole pelo menos uma URL de card do Pipefy.");
+      return;
+    }
+    setLoadingImport(true);
+    try {
+      const results = await Promise.all(
+        urls.map((url) =>
+          fetch("/api/resumo-tratativa", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cardUrl: url, pipefyToken: pipefyToken.trim() || undefined }),
+          }).then((r) => r.json())
+        )
+      );
+
+      const imported: ContentionAction[] = [];
+      let errors = 0;
+      for (const json of results) {
+        if (json.success) {
+          imported.push({ domain: json.data.nomeAgressor, status: json.data.observacao });
+        } else {
+          errors++;
+        }
+      }
+
+      if (imported.length > 0) {
+        setContentionActions(imported);
+        toast.success(`${imported.length} agressor${imported.length > 1 ? "es" : ""} importado${imported.length > 1 ? "s" : ""}!`);
+      }
+      if (errors > 0) {
+        toast.error(`${errors} card${errors > 1 ? "s" : ""} com erro — verifique a URL ou o token.`);
+      }
+    } catch {
+      toast.error("Erro de conexão ao importar cards.");
+    } finally {
+      setLoadingImport(false);
+    }
   }
 
   // ── Report text ──────────────────────────────────────────────────────────────
@@ -386,6 +439,28 @@ export function BrandBiddingClient() {
               />
             </div>
           </div>
+          <div className="mt-3">
+            <label className="block text-xs text-muted-foreground mb-1">
+              Token Pipefy <span className="font-normal">(necessário para importar status dos agressores)</span>
+            </label>
+            <div className="relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={pipefyToken}
+                onChange={(e) => setPipefyToken(e.target.value)}
+                placeholder="Cole seu token do Pipefy..."
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={() => setShowToken((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+
           <div className="mt-3 flex items-end gap-4">
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Tipo de relatório</label>
@@ -651,9 +726,59 @@ export function BrandBiddingClient() {
         <div className="rounded-xl border border-border bg-white p-5">
           <SectionLabel number={4} title="Status das Ações de Contenção" />
           <p className="text-xs text-muted-foreground mb-3">
-            Descreva o status atual das tratativas com cada agressor.
+            Cole os links dos cards do Pipefy para gerar o status automaticamente, ou preencha manualmente.
           </p>
-          <div className="space-y-3">
+
+          {/* Import from Pipefy */}
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Link size={13} className="text-primary" />
+              <span className="text-xs font-semibold text-primary">Importar do Pipefy</span>
+            </div>
+            <div className="space-y-2 mb-3">
+              {cardUrls.map((url, i) => (
+                <div key={i} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={url}
+                    onChange={(e) => setCardUrls((prev) => prev.map((u, j) => j === i ? e.target.value : u))}
+                    placeholder={`URL do card ${i + 1} (ex: app.pipefy.com/open-cards/123456)`}
+                    className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                  {cardUrls.length > 1 && (
+                    <button
+                      onClick={() => setCardUrls((prev) => prev.filter((_, j) => j !== i))}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/5 border border-border bg-white transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setCardUrls((prev) => [...prev, ""])}
+                disabled={cardUrls.length >= 8}
+                className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium transition-colors disabled:opacity-40"
+              >
+                <Plus size={12} />
+                Adicionar card
+              </button>
+              <button
+                onClick={importFromPipefy}
+                disabled={loadingImport}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/90 transition-all disabled:opacity-60"
+              >
+                {loadingImport ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                {loadingImport ? "Gerando..." : "Gerar status"}
+              </button>
+            </div>
+          </div>
+
+          {/* Manual rows */}
+          <p className="text-xs text-muted-foreground mb-2">Detalhe do andamento das principais tratativas com agressores:</p>
+          <div className="space-y-2">
             {contentionActions.map((item, i) => (
               <div key={i} className="flex gap-2">
                 <input
@@ -667,7 +792,7 @@ export function BrandBiddingClient() {
                   type="text"
                   value={item.status}
                   onChange={(e) => updateContention(i, "status", e.target.value)}
-                  placeholder="Descreva o status atual desta tratativa..."
+                  placeholder="Status atual desta tratativa..."
                   className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
                 {contentionActions.length > 1 && (
@@ -685,7 +810,7 @@ export function BrandBiddingClient() {
               className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
             >
               <Plus size={14} />
-              Adicionar agressor
+              Adicionar agressor manualmente
             </button>
           </div>
         </div>
