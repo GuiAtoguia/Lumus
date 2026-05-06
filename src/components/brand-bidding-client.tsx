@@ -221,7 +221,7 @@ export function BrandBiddingClient() {
       const errorMessages: string[] = [];
       for (const json of results) {
         if (json.success) {
-          imported.push({ domain: json.data.nomeAgressor, status: json.data.observacao });
+          imported.push({ domain: json.data!.nomeAgressor, status: json.data!.observacao });
         } else {
           errorMessages.push(json.error || "Erro desconhecido");
         }
