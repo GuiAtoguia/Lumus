@@ -233,7 +233,7 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   // SECTION 1 — Métricas Consolidadas
   // ═══════════════════════════════════════════════════════════════════
   sectionHeader(1, `Métricas Consolidadas (Últimos ${data.periodDays} dias)`);
-  bodyText(data.section1Text || "A tabela a seguir resume os principais indicadores de Brand Bidding.");
+  bodyText(data.metricsAnalysis || data.section1Text || "A tabela a seguir resume os principais indicadores de Brand Bidding.");
   y += 2;
 
   autoTable(doc, {
@@ -284,7 +284,7 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════
   sectionHeader(2, "Agressores Identificados");
   const s2Default = `Durante as últimas ${data.reportType === "Semanal" ? "semana" : "duas semanas"}, foram identificados ${data.agressoresNovos || "—"} novos agressores, elevando o total para ${data.agressoresTotal || "—"} agressores ativos no período.`;
-  bodyText(data.section2Text || s2Default);
+  bodyText(data.agressoresAnalysis || data.section2Text || s2Default);
   y += 3;
 
   await addImage(data.imageAgressores, 85);
@@ -295,7 +295,7 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   // SECTION 3 — Heatmap
   // ═══════════════════════════════════════════════════════════════════
   sectionHeader(3, "Análise de Ofensores (Heatmap)");
-  bodyText(data.section3Text || "");
+  bodyText(data.heatmapAnalysis || data.section3Text || "");
   y += 3;
 
   await addImage(data.imageHeatmap, 100);

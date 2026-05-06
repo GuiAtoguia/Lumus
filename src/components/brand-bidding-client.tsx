@@ -671,69 +671,6 @@ export function BrandBiddingClient() {
             onRegenerate={regenerateHeatmap}
           />
 
-          <div className="mt-4">
-            <label className="block text-xs text-white/50 mb-2">
-              Top agressores do heatmap <span className="font-normal">(opcional)</span>
-            </label>
-            {/* Legenda dos emojis */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {[
-                { emoji: "✅", label: "Sucesso" },
-                { emoji: "🚫", label: "Whitelist" },
-                { emoji: "🔔", label: "Em tratativa" },
-                { emoji: "🤝", label: "Parceiro" },
-              ].map(({ emoji, label }) => (
-                <span key={emoji} className="inline-flex items-center gap-1 text-[11px] text-white/50 bg-white/5 border border-white/10 rounded-full px-2 py-0.5">
-                  {emoji} {label}
-                </span>
-              ))}
-            </div>
-            <div className="space-y-2">
-              {heatmap.map((h, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  {/* Seletor de emoji — coluna esquerda, igual ao modelo */}
-                  <select
-                    value={h.emoji}
-                    onChange={(e) => updateHeatmap(i, "emoji", e.target.value)}
-                    className="w-14 shrink-0 rounded-lg border border-border px-1 py-2 text-base text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
-                    title="Classificação"
-                  >
-                    <option value="">—</option>
-                    <option value="✅">✅</option>
-                    <option value="🚫">🚫</option>
-                    <option value="🔔">🔔</option>
-                    <option value="🤝">🤝</option>
-                  </select>
-                  <input
-                    type="text" value={h.score}
-                    onChange={(e) => updateHeatmap(i, "score", e.target.value)}
-                    placeholder="Score"
-                    className="w-24 shrink-0 rounded-lg border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                  <input
-                    type="text" value={h.nome}
-                    onChange={(e) => updateHeatmap(i, "nome", e.target.value)}
-                    placeholder="dominio.com.br"
-                    className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                  {heatmap.length > 1 && (
-                    <button
-                      onClick={() => removeHeatmapEntry(i)}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/10 border border-white/10 transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={addHeatmapEntry}
-                className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
-              >
-                <Plus size={14} />Adicionar agressor
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="flex justify-end pt-1">
@@ -1124,17 +1061,6 @@ export function BrandBiddingClient() {
               <div style={{ width:"100%", background:"#fff", padding:"10px 0", borderTop:"1px solid #eee", borderBottom:"1px solid #eee", display:"flex", justifyContent:"center" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={imageHeatmapPreview} alt="" style={{ maxWidth:"100%", height:"auto", display:"block" }} />
-              </div>
-            )}
-            {heatmap.some(h => h.nome.trim()) && sectionsAtivas.heatmap && (
-              <div style={{ padding:"10px 32px 0" }}>
-                {heatmap.filter(h => h.nome.trim()).map((h, i) => (
-                  <div key={i} style={{ display:"flex", alignItems:"center", gap:"8px", padding:"3px 0" }}>
-                    <span style={{ fontSize:"13px", width:"20px", textAlign:"center" }}>{h.emoji || "·"}</span>
-                    <span style={{ fontFamily:"Inter,sans-serif", fontSize:"11px", fontWeight:"700", color:"#000", width:"56px" }}>{h.score}</span>
-                    <span style={{ fontFamily:"Inter,sans-serif", fontSize:"11px", color:"#000" }}>{h.nome}</span>
-                  </div>
-                ))}
               </div>
             )}
 
