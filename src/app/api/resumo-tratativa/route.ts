@@ -220,7 +220,7 @@ ESTRUTURA OBRIGATÓRIA:
 4. ${ultimaOcorrencia ? `Finalize SEMPRE com: "A última ocorrência registrada foi no dia ${ultimaOcorrencia}."` : "Finalize com o status atual (aguardando retorno / monitorando)"}
 
 NUNCA mencione: e-mails, nomes de pessoas, domínios, marcas/produtos, "Branddi Monitor", "ciclo", "quarentena", termos jurídicos, Markdown ou asteriscos.
-Texto simples, sem título, sem aspas. Máximo 250 caracteres.
+Texto simples, sem título, sem aspas. Pode ter mais de uma frase — escreva tudo que for relevante.
 
 EXEMPLOS REAIS (siga este estilo exato):
 No ultimo contato realizado em 29/04, tivemos um retorno do agressor alegando que não identificaram ocorrências nos testes realizados. Aguarda-se posicionamento e a última ocorrência registrada foi no dia 01/05/2026.
@@ -229,13 +229,12 @@ Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um n
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.2, maxOutputTokens: 350 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
     });
 
     const result = await model.generateContent(prompt);
     let observacao: string = result.response.text().trim();
     observacao = observacao.replace(/^["']|["']$/g, "");
-    if (observacao.length > 250) observacao = observacao.slice(0, 247) + "...";
 
     return NextResponse.json({
       success: true,
