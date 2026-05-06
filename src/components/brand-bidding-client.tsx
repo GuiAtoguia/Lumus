@@ -766,11 +766,12 @@ export function BrandBiddingClient() {
                   placeholder="dominio.com.br"
                   className="w-44 shrink-0 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
-                <input
-                  type="text" value={item.status}
+                <textarea
+                  value={item.status}
                   onChange={(e) => updateContention(i, "status", e.target.value)}
                   placeholder="Descreva o status atual..."
-                  className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  rows={3}
+                  className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                 />
                 {contentionActions.length > 1 && (
                   <button
