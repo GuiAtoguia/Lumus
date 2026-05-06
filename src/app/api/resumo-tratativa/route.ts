@@ -4,17 +4,15 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const PIPEFY_GRAPHQL = "https://api.pipefy.com/graphql";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Too Many Requests");
       const is503 = msg.includes("503") || msg.includes("Service Unavailable") || msg.includes("overloaded") || msg.includes("high demand");
-      if ((is429 || is503) && attempt < maxRetries - 1) {
-        const delay = is429 ? (attempt + 1) * 15000 : (attempt + 1) * 3000;
-        await new Promise((r) => setTimeout(r, delay));
+      if (is503 && attempt < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
       throw err;
@@ -248,7 +246,7 @@ Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um n
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1500 },
     });
 
     const result = await withRetry(() => model.generateContent(prompt));

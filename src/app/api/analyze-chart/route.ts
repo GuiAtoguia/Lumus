@@ -11,18 +11,15 @@ type ChartType = "agressores" | "heatmap" | "metricas";
 
 const MODEL_ID = "gemini-2.5-flash";
 
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const is429 = msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Too Many Requests");
       const is503 = msg.includes("503") || msg.includes("Service Unavailable") || msg.includes("overloaded") || msg.includes("high demand");
-      if ((is429 || is503) && attempt < maxRetries - 1) {
-        // 429 needs longer wait; 503 is transient
-        const delay = is429 ? (attempt + 1) * 15000 : (attempt + 1) * 3000;
-        await new Promise((r) => setTimeout(r, delay));
+      if (is503 && attempt < maxRetries - 1) {
+        await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
       throw err;
