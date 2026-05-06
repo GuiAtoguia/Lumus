@@ -247,7 +247,7 @@ No dia 22/04/2026 recebemos a confirmação da negativação. A última ocorrên
 Reforçamos o pedido em 30/04/2026 direto com hotline e seguimos aguardando um novo retorno. A última ocorrência registrada foi no dia 02/05/2026.`;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
     });
 
