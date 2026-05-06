@@ -81,6 +81,12 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   const CONTENT_W = PAGE_W - MARGIN * 2;
   const BOTTOM_LIMIT = PAGE_H - MARGIN;
 
+  // Convenience: check if a section is enabled (defaults to true if not specified)
+  const sa = data.sectionsAtivas ?? {};
+  function isOn(key: keyof NonNullable<BbPdfData["sectionsAtivas"]>): boolean {
+    return sa[key] !== false;
+  }
+
   // Load branding images
   let headerDataUrl = "";
   let watermarkDataUrl = "";
@@ -97,10 +103,10 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
     const wmH = 60;
     const wmW = 45;
     const x = PAGE_W - wmW - 5;
-    const y = PAGE_H - wmH - 5;
+    const y2 = PAGE_H - wmH - 5;
     doc.saveGraphicsState();
     doc.setGState(new GState({ opacity: 0.07 }));
-    doc.addImage(watermarkDataUrl, "PNG", x, y, wmW, wmH);
+    doc.addImage(watermarkDataUrl, "PNG", x, y2, wmW, wmH);
     doc.restoreGraphicsState();
   }
 
@@ -115,27 +121,34 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
     }
   }
 
+  // Auto-incrementing section number
+  let sectionNum = 0;
+
   // ── Section header ──
-  function sectionHeader(num: number, title: string) {
+  function sectionHeader(title: string) {
+    sectionNum++;
     checkPage(14);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
     doc.setTextColor(20, 20, 20);
-    doc.text(`${num}. ${title}`, MARGIN, y);
+    doc.text(`${sectionNum}. ${title}`, MARGIN, y);
     y += 7;
   }
 
-  // ── Body text (wrapped) ──
+  // ── Body text: line-by-line with per-line page break checks ──
   function bodyText(text: string, fontSize = 10.5) {
     if (!text.trim()) return;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(fontSize);
     doc.setTextColor(50, 50, 50);
     const lines = doc.splitTextToSize(text, CONTENT_W) as string[];
-    const needed = lines.length * (fontSize * 0.4) + 2;
-    checkPage(needed);
-    doc.text(lines, MARGIN, y);
-    y += lines.length * (fontSize * 0.4) + 2;
+    const lineH = fontSize * 0.42;
+    for (const line of lines) {
+      checkPage(lineH + 1);
+      doc.text(line, MARGIN, y);
+      y += lineH;
+    }
+    y += 2;
   }
 
   // ── Bullet item ──
@@ -147,19 +160,14 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
     doc.setFontSize(fontSize);
     doc.setTextColor(30, 30, 30);
 
-    let fullText: string;
-    if (rest) {
-      fullText = `${bullet}${label}: ${rest}`;
-    } else {
-      fullText = `${bullet}${label}`;
-    }
-
+    const fullText = rest ? `${bullet}${label}: ${rest}` : `${bullet}${label}`;
     const lines = doc.splitTextToSize(fullText, textW) as string[];
-    checkPage(lines.length * (fontSize * 0.4) + 2);
+    const lineH = fontSize * 0.42;
     lines.forEach((line: string, i: number) => {
+      checkPage(lineH + 1);
       doc.setFont("helvetica", i === 0 ? "bold" : "normal");
       doc.text(line, i === 0 ? MARGIN : indent, y);
-      y += fontSize * 0.4;
+      y += lineH;
     });
     y += 1;
   }
@@ -232,82 +240,88 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════
   // SECTION 1 — Métricas Consolidadas
   // ═══════════════════════════════════════════════════════════════════
-  sectionHeader(1, `Métricas Consolidadas (Últimos ${data.periodDays} dias)`);
-  bodyText(data.metricsAnalysis || data.section1Text || "A tabela a seguir resume os principais indicadores de Brand Bidding.");
-  y += 2;
+  if (isOn("metricas")) {
+    sectionHeader(`Métricas Consolidadas (Últimos ${data.periodDays} dias)`);
+    bodyText(data.metricsAnalysis || data.section1Text || "A tabela a seguir resume os principais indicadores de Brand Bidding.");
+    y += 2;
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: MARGIN, right: MARGIN },
-    head: [
-      [
-        "Identificados",
-        "Inativos",
-        "Ocorrências",
-        "Notificados",
-        "Eliminados",
-        "Notificações Enviadas",
+    autoTable(doc, {
+      startY: y,
+      margin: { left: MARGIN, right: MARGIN },
+      head: [
+        [
+          "Identificados",
+          "Inativos",
+          "Ocorrências",
+          "Notificados",
+          "Eliminados",
+          "Notificações Enviadas",
+        ],
       ],
-    ],
-    body: [
-      [
-        data.metrics.identificados || "—",
-        data.metrics.inativos || "—",
-        data.metrics.ocorrencias || "—",
-        data.metrics.notificados || "—",
-        data.metrics.eliminados || "—",
-        data.metrics.notificacoesEnviadas || "—",
+      body: [
+        [
+          data.metrics.identificados || "—",
+          data.metrics.inativos || "—",
+          data.metrics.ocorrencias || "—",
+          data.metrics.notificados || "—",
+          data.metrics.eliminados || "—",
+          data.metrics.notificacoesEnviadas || "—",
+        ],
       ],
-    ],
-    headStyles: {
-      fillColor: [240, 240, 240],
-      textColor: [30, 30, 30],
-      fontStyle: "bold",
-      fontSize: 9,
-      halign: "center",
-    },
-    bodyStyles: {
-      fontSize: 13,
-      fontStyle: "bold",
-      halign: "center",
-      textColor: [20, 20, 20],
-    },
-    theme: "grid",
-    tableLineColor: [200, 200, 200],
-    tableLineWidth: 0.3,
-  });
+      headStyles: {
+        fillColor: [240, 240, 240],
+        textColor: [30, 30, 30],
+        fontStyle: "bold",
+        fontSize: 9,
+        halign: "center",
+      },
+      bodyStyles: {
+        fontSize: 13,
+        fontStyle: "bold",
+        halign: "center",
+        textColor: [20, 20, 20],
+      },
+      theme: "grid",
+      tableLineColor: [200, 200, 200],
+      tableLineWidth: 0.3,
+    });
 
-  y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+    y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+  }
 
   // ═══════════════════════════════════════════════════════════════════
   // SECTION 2 — Agressores Identificados
   // ═══════════════════════════════════════════════════════════════════
-  sectionHeader(2, "Agressores Identificados");
-  const s2Default = `Durante as últimas ${data.reportType === "Semanal" ? "semana" : "duas semanas"}, foram identificados ${data.agressoresNovos || "—"} novos agressores, elevando o total para ${data.agressoresTotal || "—"} agressores ativos no período.`;
-  bodyText(data.agressoresAnalysis || data.section2Text || s2Default);
-  y += 3;
+  if (isOn("agressores")) {
+    sectionHeader("Agressores Identificados");
+    const s2Default = `Durante as últimas ${data.reportType === "Semanal" ? "semana" : "duas semanas"}, foram identificados ${data.agressoresNovos || "—"} novos agressores, elevando o total para ${data.agressoresTotal || "—"} agressores ativos no período.`;
+    bodyText(data.agressoresAnalysis || data.section2Text || s2Default);
+    y += 3;
 
-  await addImage(data.imageAgressores, 85);
+    await addImage(data.imageAgressores, 85);
 
-  y += 4;
+    y += 4;
+  }
 
   // ═══════════════════════════════════════════════════════════════════
   // SECTION 3 — Heatmap
   // ═══════════════════════════════════════════════════════════════════
-  sectionHeader(3, "Análise de Ofensores (Heatmap)");
-  bodyText(data.heatmapAnalysis || data.section3Text || "");
-  y += 3;
+  if (isOn("heatmap")) {
+    sectionHeader("Análise de Ofensores (Heatmap)");
+    bodyText(data.heatmapAnalysis || data.section3Text || "");
+    y += 3;
 
-  await addImage(data.imageHeatmap, 100);
+    await addImage(data.imageHeatmap, 100);
 
-  y += 4;
+    y += 4;
+  }
 
   // ═══════════════════════════════════════════════════════════════════
   // SECTION 4 — Ações de Contenção
   // ═══════════════════════════════════════════════════════════════════
   const validActions = data.contentionActions.filter((a) => a.domain.trim());
-  if (validActions.length > 0) {
-    sectionHeader(4, "Status das Ações de Contenção");
+  if (isOn("contencao") && validActions.length > 0) {
+    sectionHeader("Status das Ações de Contenção");
     bodyText("Detalhe do andamento das principais tratativas com agressores:");
     y += 2;
     for (const action of validActions) {
@@ -320,8 +334,8 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   // SECTION 5 — Standby
   // ═══════════════════════════════════════════════════════════════════
   const validStandby = data.standbyCases.filter((c) => c.agressor.trim());
-  if (validStandby.length > 0) {
-    sectionHeader(5, "Casos em Standby e em Notificação Extrajudicial");
+  if (isOn("standby") && validStandby.length > 0) {
+    sectionHeader("Casos em Standby e em Notificação Extrajudicial");
     bodyText(
       "Os seguintes casos estão em standby ou em processo de notificação extrajudicial, após esgotamento das tentativas de contato direto:"
     );
@@ -358,8 +372,8 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  if (approvalList.length > 0) {
-    sectionHeader(6, "Agressores Aguardando Aprovação");
+  if (isOn("aprovacao") && approvalList.length > 0) {
+    sectionHeader("Agressores Aguardando Aprovação");
     bodyText(
       "A lista abaixo inclui os agressores recém-identificados que aguardam aprovação para o início das tratativas:"
     );
@@ -377,8 +391,8 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  if (resolvedList.length > 0) {
-    sectionHeader(7, "Agressores Resolvidos (Sucesso)");
+  if (isOn("resolvidos") && resolvedList.length > 0) {
+    sectionHeader("Agressores Resolvidos (Sucesso)");
     bodyText(
       "Os seguintes agressores tiveram suas atividades contidas com sucesso nos últimos dias:"
     );
