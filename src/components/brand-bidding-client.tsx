@@ -213,9 +213,8 @@ export function BrandBiddingClient() {
           body: JSON.stringify({ cardUrl: url, pipefyToken: pipefyToken.trim() || undefined }),
         }).then((r) => r.json());
         results.push(json);
-        // Delay between cards to stay under Gemini's 15 req/min limit
         if (urls.indexOf(url) < urls.length - 1) {
-          await new Promise((r) => setTimeout(r, 5000));
+          await new Promise((r) => setTimeout(r, 1500));
         }
       }
       const imported: ContentionAction[] = [];
