@@ -167,6 +167,7 @@ export interface PresentationData {
   // Tratativa em Prioridade - Slide 19
   prioridadeAgressor: string;
   prioridadeTexto: string;
+  prioridadeEvidenciaUrl: string;
   prioridadeMediacaoSteps: MediacaoStep[];
 
   // Negativações - Slide 20
@@ -1262,39 +1263,52 @@ function addTratativaPrioridadeSlide(pptx: pptxgen, data: PresentationData, logo
   addSlideChrome(slide, logo, bg);
   addContentTitle(slide, "Tratativa em Prioridade");
 
+  // Fase/título — "Mediação" centralizdo abaixo do header, lado esquerdo
   slide.addText("Mediação", {
-    x: 0.4, y: 1.5, w: 7, h: 0.5,
-    fontFace: FONT_HEADING, fontSize: 18, bold: true, color: COLORS.primary,
+    x: 0.4, y: 1.72, w: 5.0, h: 0.45,
+    fontFace: FONT_HEADING, fontSize: 16, bold: true, color: COLORS.cyan, align: "center",
   });
 
-  // Steps de mediação
-  data.prioridadeMediacaoSteps.slice(0, 5).forEach((step, i) => {
+  // Seta entre colunas
+  slide.addText("···→", {
+    x: 5.55, y: 3.5, w: 0.9, h: 0.4,
+    fontFace: FONT_BODY, fontSize: 12, color: COLORS.cyan, align: "center",
+  });
+
+  // Steps numerados — esquerda
+  data.prioridadeMediacaoSteps.filter(s => s.text.trim()).slice(0, 6).forEach((step, i) => {
     slide.addText(`${i + 1}.`, {
-      x: 0.4, y: 2.2 + i * 0.7, w: 0.4, h: 0.4,
-      fontFace: FONT_HEADING, fontSize: 14, bold: true, color: COLORS.cyan,
+      x: 0.4, y: 2.30 + i * 0.60, w: 0.35, h: 0.55,
+      fontFace: FONT_HEADING, fontSize: 12, bold: true, color: COLORS.cyan, align: "center",
     });
     slide.addText(step.text, {
-      x: 0.9, y: 2.2 + i * 0.7, w: 7, h: 0.6,
+      x: 0.80, y: 2.30 + i * 0.60, w: 4.60, h: 0.55,
       fontFace: FONT_BODY, fontSize: 11, color: COLORS.textDark,
     });
   });
 
-  // Box do agressor (lado direito)
+  // Nome do agressor — acima da evidência, lado direito
+  slide.addText(data.prioridadeTexto || data.prioridadeAgressor || "—", {
+    x: 6.50, y: 1.72, w: 6.40, h: 0.45,
+    fontFace: FONT_BODY, fontSize: 13, bold: false, color: COLORS.cyan, align: "center",
+  });
+
+  // Box evidência arredondada (direita)
   slide.addShape("roundRect", {
-    x: 8.5, y: 2.0, w: 4.4, h: 4,
-    fill: { color: COLORS.white }, line: { color: COLORS.cyanLight, width: 1 },
-    rectRadius: 0.1,
+    x: 6.50, y: 2.25, w: 6.40, h: 4.70,
+    fill: { color: COLORS.white },
+    line: { color: COLORS.cyan, width: 1.5 },
+    rectRadius: 0.20,
   });
 
-  slide.addText(data.prioridadeAgressor || "—", {
-    x: 8.6, y: 2.2, w: 4.2, h: 0.6,
-    fontFace: FONT_HEADING, fontSize: 16, bold: true, color: COLORS.primary, align: "center",
-  });
-
-  if (data.prioridadeTexto) {
-    slide.addText(data.prioridadeTexto, {
-      x: 8.7, y: 2.9, w: 4, h: 3,
-      fontFace: FONT_BODY, fontSize: 10, color: COLORS.textDark,
+  // Imagem da evidência dentro do box
+  if (data.prioridadeEvidenciaUrl) {
+    const pad = 0.15;
+    slide.addImage({
+      data: data.prioridadeEvidenciaUrl,
+      x: 6.50 + pad, y: 2.25 + pad,
+      w: 6.40 - pad * 2, h: 4.70 - pad * 2,
+      sizing: { type: "contain", w: 6.40 - pad * 2, h: 4.70 - pad * 2 },
     });
   }
 }

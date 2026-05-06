@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import {
   ChevronRight, ChevronLeft, Check, Loader2, Plus, Trash2,
-  Eye, Presentation,
+  Eye, Presentation, X, ImageIcon, ClipboardCopy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -223,6 +223,114 @@ function emptyBigNumbers(): BigNumbers {
   };
 }
 
+// ─── SimpleImageZone: zona de upload/paste sem análise de IA ─────────────────
+
+function SimpleImageZone({
+  label,
+  preview,
+  enabled = true,
+  onToggle,
+  onFile,
+  onClear,
+}: {
+  label: string;
+  preview: string;
+  enabled?: boolean;
+  onToggle?: () => void;
+  onFile: (file: File) => void;
+  onClear: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
+
+  function handleFile(file: File | null | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Apenas imagens (PNG, JPG, etc.)"); return; }
+    onFile(file);
+  }
+
+  useEffect(() => {
+    if (!isFocused) return;
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) { e.preventDefault(); handleFile(file); toast.success("Imagem colada!"); return; }
+        }
+      }
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-white/50">{label}</p>
+        {onToggle && (
+          <button type="button" onClick={onToggle}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-all",
+              enabled
+                ? "bg-cyan-500/20 border-cyan-400/40 text-cyan-300 hover:bg-cyan-500/30"
+                : "bg-white/5 border-white/10 text-white/25 hover:border-white/20"
+            )}>
+            <div className={cn("w-1.5 h-1.5 rounded-full transition-all", enabled ? "bg-cyan-400" : "bg-white/20")} />
+            {enabled ? "Incluir no PPT" : "Não incluir"}
+          </button>
+        )}
+      </div>
+      <div className={cn("transition-all", !enabled && "opacity-30 pointer-events-none select-none")}>
+        <div
+          ref={dropRef}
+          tabIndex={0}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onClick={() => { setIsFocused(true); if (!preview) inputRef.current?.click(); }}
+          onDrop={(e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); }}
+          onDragOver={(e) => e.preventDefault()}
+          className={cn(
+            "relative rounded-xl border-2 transition-all overflow-hidden outline-none",
+            preview
+              ? "border-cyan-400/50 bg-[#0a2235] cursor-default"
+              : "border-dashed border-white/20 hover:border-cyan-400/50 hover:bg-cyan-500/5 cursor-pointer",
+            isFocused && !preview && "ring-2 ring-cyan-400/20 border-cyan-400/60 bg-cyan-500/5"
+          )}
+        >
+          <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} />
+          {preview ? (
+            <>
+              <div className="w-full p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={preview} alt={label} className="w-full h-auto object-contain rounded-lg" style={{ display: "block" }} />
+              </div>
+              <button type="button" onClick={(e) => { e.stopPropagation(); onClear(); }}
+                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-500/80 transition-colors"
+                title="Remover imagem">
+                <X size={12} />
+              </button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-8">
+              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <ImageIcon size={18} className="text-white/30" />
+              </div>
+              <p className="text-sm font-medium text-white/50">Clique, arraste ou cole (Ctrl+V)</p>
+              <p className="text-[11px] text-white/25 flex items-center gap-1">
+                <ClipboardCopy size={10} />Cole um print da área de transferência
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export function ApresentacaoMensalClient() {
@@ -321,6 +429,7 @@ export function ApresentacaoMensalClient() {
   // PRIORIDADE
   const [prioridadeAgressor, setPrioridadeAgressor] = useState("");
   const [prioridadeTexto, setPrioridadeTexto] = useState("");
+  const [prioridadeEvidenciaUrl, setPrioridadeEvidenciaUrl] = useState<string>("");
   const [prioridadeMediacaoSteps, setPrioridadeMediacaoSteps] = useState<MediacaoStep[]>([
     { text: "" }, { text: "" }, { text: "" }
   ]);
@@ -688,6 +797,7 @@ export function ApresentacaoMensalClient() {
         termosAtingidosRows: termosAtingidosRows.filter((r) => r.agressor.trim()),
 
         prioridadeAgressor, prioridadeTexto,
+        prioridadeEvidenciaUrl,
         prioridadeMediacaoSteps: prioridadeMediacaoSteps.filter((s) => s.text.trim()),
 
         negativacoes: negativacoes.filter((n) => n.agressor.trim()),
@@ -1051,15 +1161,6 @@ export function ApresentacaoMensalClient() {
 
 
         {/* Slide Vazio */}
-        <div className={cn("rounded-xl border backdrop-blur-sm p-5", slidesAtivos.slideVazio ? "border-white/10 bg-white/5" : "border-white/5 bg-white/2 opacity-50")}>
-          <div className="flex items-center justify-between">
-            <SectionLabel number="10" title="Slide em Branco (espaçador)" />
-            <SlideToggle slideKey="slideVazio" label="Slide 10" />
-          </div>
-          {slidesAtivos.slideVazio && (
-            <p className="text-xs text-white/40 mt-2 italic">Slide em branco inserido na apresentação como espaçador.</p>
-          )}
-        </div>
 
         <div className="flex justify-between pt-1">
           <button onClick={() => setStep(1)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all">
@@ -1230,22 +1331,43 @@ export function ApresentacaoMensalClient() {
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
             </div>
-            <ChartSection {...chartProps(trademarkShare, "trademark_evidencia", "Print Share de Trademark", "agressores", "trademarkShareChart")} />
+            {/* Gráfico share — sem análise de IA, com paste/drag/click */}
+            <SimpleImageZone
+              label="Print Share de Trademark"
+              preview={trademarkShare.preview}
+              enabled={chartsAtivos.trademarkShareChart}
+              onToggle={() => toggleChart("trademarkShareChart")}
+              onFile={(f) => {
+                if (trademarkShare.preview) URL.revokeObjectURL(trademarkShare.preview);
+                trademarkShare.setFile(f);
+                trademarkShare.setPreview(URL.createObjectURL(f));
+              }}
+              onClear={() => handleClear(trademarkShare)}
+            />
+            {/* Evidências colapsáveis */}
             <div className="mt-4">
-              <p className="text-xs font-semibold text-cyan-300 mb-2">Evidências (até 2 prints)</p>
               {trademarkEvidences.map((ev, i) => (
-                <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-3 mb-2 space-y-2">
-                  <input type="text" value={ev.caption}
-                    onChange={(e) => setTrademarkEvidences((prev) => prev.map((x, idx) => idx === i ? { ...x, caption: e.target.value } : x))}
-                    placeholder={`Legenda da Evidência ${i + 1}`}
-                    className="w-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                  <input type="file" accept="image/*"
-                    onChange={(e) => e.target.files?.[0] && handleTradEvidImage(i, e.target.files[0])}
-                    className="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-white/15 file:bg-white/10 file:text-white file:text-xs file:cursor-pointer cursor-pointer text-white/40" />
-                  {ev.imageDataUrl && (
-                    <img src={ev.imageDataUrl} alt="" className="max-h-24 rounded border border-border" />
-                  )}
-                </div>
+                <details key={i} className="rounded-lg border border-white/10 bg-white/5 mb-2 group">
+                  <summary className="cursor-pointer list-none px-3 py-2.5 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-cyan-300 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-[10px] font-bold">{i + 1}</span>
+                      {ev.caption || `Evidência ${i + 1}`}
+                    </span>
+                    <span className="text-white/30 text-xs group-open:rotate-180 transition-transform">▼</span>
+                  </summary>
+                  <div className="px-3 pb-3 space-y-2 border-t border-white/10 pt-2.5">
+                    <input type="text" value={ev.caption}
+                      onChange={(e) => setTrademarkEvidences((prev) => prev.map((x, idx) => idx === i ? { ...x, caption: e.target.value } : x))}
+                      placeholder={`Nome do agressor (ex: wise.com.br)`}
+                      className="w-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
+                    <SimpleImageZone
+                      label="Print da evidência (cole, arraste ou clique)"
+                      preview={ev.imageDataUrl ?? ""}
+                      onFile={(f) => handleTradEvidImage(i, f)}
+                      onClear={() => setTrademarkEvidences((prev) => prev.map((x, idx) => idx === i ? { ...x, imageDataUrl: null } : x))}
+                    />
+                  </div>
+                </details>
               ))}
             </div>
           </>}
@@ -1272,7 +1394,19 @@ export function ApresentacaoMensalClient() {
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
             </div>
-            <ChartSection {...chartProps(trademarkAprov, "trademark_aprovacao", "Print Trademark - Aprovação", "agressores", "trademarkAprovChart")} />
+            {/* Gráfico aprovação — sem análise de IA, com paste/drag/click */}
+            <SimpleImageZone
+              label="Print Trademark - Aprovação"
+              preview={trademarkAprov.preview}
+              enabled={chartsAtivos.trademarkAprovChart}
+              onToggle={() => toggleChart("trademarkAprovChart")}
+              onFile={(f) => {
+                if (trademarkAprov.preview) URL.revokeObjectURL(trademarkAprov.preview);
+                trademarkAprov.setFile(f);
+                trademarkAprov.setPreview(URL.createObjectURL(f));
+              }}
+              onClear={() => handleClear(trademarkAprov)}
+            />
           </>}
         </div>
 
@@ -1378,117 +1512,6 @@ export function ApresentacaoMensalClient() {
         </div>
 
         {/* Evolução */}
-        <div className={cn("rounded-xl border backdrop-blur-sm p-5", slidesAtivos.evolucao ? "border-white/10 bg-white/5" : "border-white/5 bg-white/2 opacity-50")}>
-          <div className="flex items-center justify-between mb-3">
-            <SectionLabel number="16" title="Evolução de Agressividade (tabela)" />
-            <SlideToggle slideKey="evolucao" label="Slide 16" />
-          </div>
-          {slidesAtivos.evolucao && <>
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {[0, 1, 2].map((i) => (
-                <input key={i} type="text" value={evolucaoMeses[i]}
-                  onChange={(e) => setEvolucaoMeses((prev) => {
-                    const next = [...prev] as [string, string, string];
-                    next[i] = e.target.value;
-                    return next;
-                  })}
-                  placeholder={`Mês ${i + 1}`}
-                  className="w-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-              ))}
-            </div>
-            {evolucaoRows.map((r, i) => (
-              <div key={i} className="grid grid-cols-5 gap-2 mb-2 items-center">
-                <input type="text" value={r.domain}
-                  onChange={(e) => setEvolucaoRows((prev) => prev.map((x, idx) => idx === i ? { ...x, domain: e.target.value } : x))}
-                  placeholder="dominio.com.br"
-                  className="col-span-2 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                <input type="text" value={r.mes1}
-                  onChange={(e) => setEvolucaoRows((prev) => prev.map((x, idx) => idx === i ? { ...x, mes1: e.target.value } : x))}
-                  placeholder="Mês 1"
-                  className="rounded-lg border border-border px-3 py-2 text-xs text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-                <input type="text" value={r.mes2}
-                  onChange={(e) => setEvolucaoRows((prev) => prev.map((x, idx) => idx === i ? { ...x, mes2: e.target.value } : x))}
-                  placeholder="Mês 2"
-                  className="rounded-lg border border-border px-3 py-2 text-xs text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-                <div className="flex gap-1">
-                  <input type="text" value={r.mes3}
-                    onChange={(e) => setEvolucaoRows((prev) => prev.map((x, idx) => idx === i ? { ...x, mes3: e.target.value } : x))}
-                    placeholder="Mês 3"
-                    className="flex-1 rounded-lg border border-border px-3 py-2 text-xs text-center focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-                  <button onClick={() => setEvolucaoRows((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="w-9 h-9 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 border border-white/10">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-            <button onClick={() => setEvolucaoRows([...evolucaoRows, emptyEvolucaoRow()])}
-              className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
-              <Plus size={14} />Adicionar linha
-            </button>
-            <textarea value={evolucaoAnalysis} onChange={(e) => setEvolucaoAnalysis(e.target.value)}
-              rows={2} placeholder="📌 Análise (texto azul abaixo da tabela)"
-              className="w-full mt-3 rounded-lg border border-border px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-          </>}
-        </div>
-
-        {/* Tratativas */}
-        <div className={cn("rounded-xl border backdrop-blur-sm p-5", slidesAtivos.tratativas ? "border-white/10 bg-white/5" : "border-white/5 bg-white/2 opacity-50")}>
-          <div className="flex items-center justify-between mb-3">
-            <SectionLabel number="17" title="Tratativas em Andamento" />
-            <SlideToggle slideKey="tratativas" label="Slide 17" />
-          </div>
-          {slidesAtivos.tratativas && <>
-            {tratativas.map((t, i) => (
-              <div key={i} className="rounded-lg border border-white/10 bg-white/5 p-3 mb-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-cyan-300">Agressor {i + 1}</span>
-                  {tratativas.length > 1 && (
-                    <button onClick={() => setTratativas((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-destructive">
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <input type="text" value={t.agressividade} onChange={(e) => updateTrat(i, "agressividade", e.target.value)}
-                    placeholder="Agressiv. (8.5)"
-                    className="rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                  <input type="text" value={t.agressor} onChange={(e) => updateTrat(i, "agressor", e.target.value)}
-                    placeholder="Domínio agressor"
-                    className="col-span-2 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                </div>
-                <input type="text" value={t.termos} onChange={(e) => updateTrat(i, "termos", e.target.value)}
-                  placeholder="Termos atingidos"
-                  className="w-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                <div className="grid grid-cols-4 gap-2">
-                  <select value={t.topLeilao} onChange={(e) => updateTrat(i, "topLeilao", e.target.value)}
-                    className="rounded-lg border border-gray-200 bg-white text-gray-900 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60">
-                    <option value="—">Top Leilão: —</option>
-                    <option value="sim">Top Leilão: Sim</option>
-                    <option value="nao">Top Leilão: Não</option>
-                  </select>
-                  <input type="text" value={t.notificacoes} onChange={(e) => updateTrat(i, "notificacoes", e.target.value)} placeholder="Nº Notif."
-                    className="rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                  <input type="text" value={t.ultimaComunicacao} onChange={(e) => updateTrat(i, "ultimaComunicacao", e.target.value)} placeholder="Última (DD/MM/AA)"
-                    className="rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                  <select value={t.respondeu} onChange={(e) => updateTrat(i, "respondeu", e.target.value)}
-                    className="rounded-lg border border-gray-200 bg-white text-gray-900 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60">
-                    <option value="—">Respondeu: —</option>
-                    <option value="sim">Respondeu: Sim</option>
-                    <option value="nao">Respondeu: Não</option>
-                  </select>
-                </div>
-                <textarea value={t.observacao} onChange={(e) => updateTrat(i, "observacao", e.target.value)}
-                  rows={2} placeholder="Observação"
-                  className="w-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-              </div>
-            ))}
-            <button onClick={() => setTratativas([...tratativas, { agressor: "", agressividade: "", termos: "", topLeilao: "—", notificacoes: "", ultimaComunicacao: "", respondeu: "—", observacao: "" }])}
-              className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
-              <Plus size={14} />Adicionar
-            </button>
-          </>}
-        </div>
 
         {/* Termos atingidos */}
         <div className={cn("rounded-xl border backdrop-blur-sm p-5", slidesAtivos.termosAtingidos ? "border-white/10 bg-white/5" : "border-white/5 bg-white/2 opacity-50")}>
@@ -1529,30 +1552,56 @@ export function ApresentacaoMensalClient() {
             <SlideToggle slideKey="prioridade" label="Slide 19" />
           </div>
           {slidesAtivos.prioridade && <>
-            <input type="text" value={prioridadeAgressor} onChange={(e) => setPrioridadeAgressor(e.target.value)}
-              placeholder="Agressor (ex: wise.com.br)"
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-            <textarea value={prioridadeTexto} onChange={(e) => setPrioridadeTexto(e.target.value)}
-              rows={3} placeholder="Texto/contexto sobre o agressor"
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm resize-none mb-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-            <p className="text-xs font-semibold text-cyan-300 mb-2">Steps de Mediação</p>
-            {prioridadeMediacaoSteps.map((s, i) => (
-              <div key={i} className="flex gap-2 mb-2">
-                <span className="w-6 text-xs text-white/40 pt-2.5">{i + 1}.</span>
-                <input type="text" value={s.text}
-                  onChange={(e) => setPrioridadeMediacaoSteps((prev) => prev.map((x, idx) => idx === i ? { text: e.target.value } : x))}
-                  placeholder="Step de mediação"
-                  className="flex-1 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
-                <button onClick={() => setPrioridadeMediacaoSteps((prev) => prev.filter((_, idx) => idx !== i))}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 border border-white/10">
-                  <Trash2 size={12} />
+            {/* Fase/título da prioridade (exibido acima de tudo no slide) */}
+            <div className="mb-3">
+              <label className="block text-xs text-white/50 mb-1">Fase / Título da Prioridade</label>
+              <input type="text" value={prioridadeAgressor} onChange={(e) => setPrioridadeAgressor(e.target.value)}
+                placeholder="Ex: Mediação"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+            </div>
+
+            {/* Layout 2 colunas: esquerda = steps, direita = evidência */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Esquerda: steps de mediação */}
+              <div>
+                <p className="text-xs font-semibold text-cyan-300 mb-2">📋 Descrição / Steps</p>
+                {prioridadeMediacaoSteps.map((s, i) => (
+                  <div key={i} className="flex gap-2 mb-2">
+                    <span className="w-6 text-xs text-white/40 pt-2.5 shrink-0">{i + 1}.</span>
+                    <input type="text" value={s.text}
+                      onChange={(e) => setPrioridadeMediacaoSteps((prev) => prev.map((x, idx) => idx === i ? { text: e.target.value } : x))}
+                      placeholder="Descreva o passo..."
+                      className="flex-1 rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
+                    <button onClick={() => setPrioridadeMediacaoSteps((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 border border-white/10 shrink-0">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={() => setPrioridadeMediacaoSteps([...prioridadeMediacaoSteps, { text: "" }])}
+                  className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors mt-1">
+                  <Plus size={14} />Adicionar step
                 </button>
               </div>
-            ))}
-            <button onClick={() => setPrioridadeMediacaoSteps([...prioridadeMediacaoSteps, { text: "" }])}
-              className="flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
-              <Plus size={14} />Adicionar step
-            </button>
+
+              {/* Direita: evidência com nome acima */}
+              <div>
+                <p className="text-xs font-semibold text-cyan-300 mb-2">🖼️ Evidência (nome + print)</p>
+                <input type="text" value={prioridadeTexto} onChange={(e) => setPrioridadeTexto(e.target.value)}
+                  placeholder="Nome do agressor (ex: wise.com.br)"
+                  className="w-full rounded-lg border border-gray-200 bg-white text-gray-900 placeholder:text-gray-400 px-3 py-2 text-xs mb-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500/60" />
+                <SimpleImageZone
+                  label="Print da evidência (cole, arraste ou clique)"
+                  preview={prioridadeEvidenciaUrl}
+                  onFile={async (f) => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setPrioridadeEvidenciaUrl(ev.target?.result as string);
+                    reader.readAsDataURL(f);
+                  }}
+                  onClear={() => setPrioridadeEvidenciaUrl("")}
+                />
+              </div>
+            </div>
           </>}
         </div>
 
