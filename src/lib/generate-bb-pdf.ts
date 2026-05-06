@@ -242,7 +242,7 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
   // ═══════════════════════════════════════════════════════════════════
   if (isOn("metricas")) {
     sectionHeader(`Métricas Consolidadas (Últimos ${data.periodDays} dias)`);
-    bodyText(data.metricsAnalysis || data.section1Text || "A tabela a seguir resume os principais indicadores de Brand Bidding.");
+    bodyText("A tabela a seguir resume os principais indicadores de Brand Bidding.");
     y += 2;
 
     autoTable(doc, {
@@ -286,7 +286,12 @@ export async function generateBbPdf(data: BbPdfData): Promise<void> {
       tableLineWidth: 0.3,
     });
 
-    y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+    y = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+
+    if (data.metricsAnalysis) {
+      bodyText(data.metricsAnalysis);
+    }
+    y += 4;
   }
 
   // ═══════════════════════════════════════════════════════════════════
